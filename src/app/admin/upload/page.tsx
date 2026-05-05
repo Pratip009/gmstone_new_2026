@@ -5,7 +5,6 @@ import Link from 'next/link';
 
 /* ── Inline styles ─────────────────────────────────────────────────────────── */
 const css = `
-  @import url('https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Playfair+Display:wght@500;600&family=DM+Sans:wght@400;500;600&display=swap');
 
   .bu-root { font-family: 'DM Sans', sans-serif; color: #0f172a; background: #f8f7f4; min-height: 100vh; padding: 2rem; }
   .bu-root * { box-sizing: border-box; }

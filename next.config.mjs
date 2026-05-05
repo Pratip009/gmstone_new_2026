@@ -8,6 +8,7 @@ const nextConfig = {
       { protocol: "https", hostname: "*" },
       { protocol: "http", hostname: "*" },
     ],
+    domains: ['images.pexels.com'],
   },
   env: {
     JWT_SECRET: process.env.JWT_SECRET, // ✅ exposes to Edge middleware

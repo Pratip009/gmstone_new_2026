@@ -6,7 +6,6 @@ import Link from "next/link";
 
 /* ── Inline design tokens ─────────────────────────────────────────────────── */
 const css = `
-  @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600&family=Playfair+Display:wght@600&display=swap');
 
   .ap-root { font-family: 'DM Sans', sans-serif; color: #0f172a; background: #f8f7f4; min-height: 100vh; padding: 2rem; }
   .ap-root * { box-sizing: border-box; }

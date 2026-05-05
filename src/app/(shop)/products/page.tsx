@@ -89,13 +89,27 @@ export default async function ProductsPage({ searchParams }: PageProps) {
                   - 4 cols on xl (1280px)
                 */}
                 <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-2.5 sm:gap-3 mt-3">
-                  {products.map((p: Record<string, unknown>) => (
-                    <ProductCard
-                      key={String(p._id)}
-                      product={p as Parameters<typeof ProductCard>[0]['product']}
-                    />
-                  ))}
-                </div>
+  {products.map((p: Record<string, unknown>) => {
+    const serialized = {
+      _id:           String(p._id),
+      name:          p.name as string,
+      price:         p.price as number,
+      shape:         p.shape as string | string[],
+      size:          p.size as number,
+      color:         p.color as string | string[],
+      clarity:       p.clarity as string | string[],
+      certification: p.certification as string | string[] | undefined,
+      images:        p.images as string[],
+      stock:         p.stock as number,
+    };
+    return (
+      <ProductCard
+        key={serialized._id}
+        product={serialized}
+      />
+    );
+  })}
+</div>
 
                 <div className="mt-10 sm:mt-12">
                   <Pagination page={page} totalPages={totalPages} searchParams={searchParams} />

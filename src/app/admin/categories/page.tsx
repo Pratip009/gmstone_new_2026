@@ -82,7 +82,6 @@ export default function AdminCategoriesPage() {
 <meta charset="UTF-8"/>
 <title>Catalogue Structure</title>
 <style>
-  @import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;600;700&family=DM+Sans:wght@300;400;500;600&family=DM+Mono:wght@400&display=swap');
 
   * { box-sizing: border-box; margin: 0; padding: 0; }
 

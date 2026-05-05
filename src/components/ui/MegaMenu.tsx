@@ -18,11 +18,19 @@ export interface Category {
   subcategories: Subcategory[];
 }
 
-// Icons assigned by position
-const CATEGORY_ICONS = ['◆', '❋', '✦', '⬡', '◈', '✧', '⬟', '◇'];
+// Per-category light palette: [bg tint, accent colour, dim accent]
+const CATEGORY_PALETTE: { bg: string; accent: string; dim: string; tint: string }[] = [
+  { bg: 'linear-gradient(135deg, #fffdf5 0%, #fdf6e3 100%)', accent: '#b8860b', dim: '#d4a84b', tint: '#fdf6e3' },
+  { bg: 'linear-gradient(135deg, #f5f9fd 0%, #e8f2f9 100%)', accent: '#2c5a74', dim: '#5b9ab8', tint: '#e8f2f9' },
+  { bg: 'linear-gradient(135deg, #fdf5ff 0%, #f5eafc 100%)', accent: '#6b3d82', dim: '#a67dc0', tint: '#f5eafc' },
+  { bg: 'linear-gradient(135deg, #f5fdf8 0%, #e8f8ee 100%)', accent: '#2a6644', dim: '#5aab7a', tint: '#e8f8ee' },
+  { bg: 'linear-gradient(135deg, #fdf5f5 0%, #fce8e8 100%)', accent: '#7a2e2e', dim: '#b86666', tint: '#fce8e8' },
+  { bg: 'linear-gradient(135deg, #f5f6fd 0%, #e8ecf9 100%)', accent: '#2e4472', dim: '#6278b8', tint: '#e8ecf9' },
+  { bg: 'linear-gradient(135deg, #fdfaf0 0%, #f8f2d8 100%)', accent: '#6e5a1a', dim: '#b09040', tint: '#f8f2d8' },
+  { bg: 'linear-gradient(135deg, #f5fdfb 0%, #e2f7f5 100%)', accent: '#226660', dim: '#4aada6', tint: '#e2f7f5' },
+];
 
 // ─── Data hook ────────────────────────────────────────────────────────────────
-// Calls your existing route: GET /api/categories?withSubcategories=true
 function useMegaMenuData() {
   const [categories, setCategories] = useState<Category[]>([]);
   const [loading, setLoading] = useState(true);
@@ -30,16 +38,11 @@ function useMegaMenuData() {
 
   useEffect(() => {
     let cancelled = false;
-
     async function fetchCategories() {
       try {
         const res = await fetch('/api/categories?withSubcategories=true');
-
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
-
         const json = await res.json();
-
-        // Your route returns: { data: [ { name, slug, description, subcategories: [...] } ] }
         const data: Category[] = (json.data ?? []).map((cat: any) => ({
           label: cat.name,
           slug: cat.slug,
@@ -52,20 +55,11 @@ function useMegaMenuData() {
             href: `/products?category=${cat.slug}&subcategory=${sub.slug}`,
           })),
         }));
-
-        if (!cancelled) {
-          setCategories(data);
-          setLoading(false);
-        }
-      } catch (err) {
-        if (!cancelled) {
-          console.error('[MegaMenu] Failed to load categories:', err);
-          setError(true);
-          setLoading(false);
-        }
+        if (!cancelled) { setCategories(data); setLoading(false); }
+      } catch {
+        if (!cancelled) { setError(true); setLoading(false); }
       }
     }
-
     fetchCategories();
     return () => { cancelled = true; };
   }, []);
@@ -76,18 +70,14 @@ function useMegaMenuData() {
 // ─── MegaMenu Component ───────────────────────────────────────────────────────
 export default function MegaMenu() {
   const { categories, loading, error } = useMegaMenuData();
-
   const [open, setOpen] = useState(false);
-  const [activeCategory, setActiveCategory] = useState<Category | null>(null);
+  const [mobileOpen, setMobileOpen] = useState(false);
+  const [activeIdx, setActiveIdx] = useState(0);
+  const [mobileCatIdx, setMobileCatIdx] = useState<number | null>(null);
   const closeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const menuRef = useRef<HTMLDivElement>(null);
 
-  // Set first category as active once data arrives
-  useEffect(() => {
-    if (categories.length && !activeCategory) {
-      setActiveCategory(categories[0]);
-    }
-  }, [categories, activeCategory]);
+  const activeCategory = categories[activeIdx] ?? null;
 
   const handleMouseEnter = useCallback(() => {
     if (closeTimer.current) clearTimeout(closeTimer.current);
@@ -95,425 +85,799 @@ export default function MegaMenu() {
   }, []);
 
   const handleMouseLeave = useCallback(() => {
-    closeTimer.current = setTimeout(() => setOpen(false), 120);
+    closeTimer.current = setTimeout(() => setOpen(false), 150);
   }, []);
 
-  // Close on outside click
   useEffect(() => {
     const handler = (e: MouseEvent) => {
-      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
-        setOpen(false);
-      }
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) setOpen(false);
     };
     document.addEventListener('mousedown', handler);
     return () => document.removeEventListener('mousedown', handler);
   }, []);
 
+  // Lock scroll when mobile drawer open
+  useEffect(() => {
+    document.body.style.overflow = mobileOpen ? 'hidden' : '';
+    return () => { document.body.style.overflow = ''; };
+  }, [mobileOpen]);
+
+  const palette = CATEGORY_PALETTE[activeIdx % CATEGORY_PALETTE.length];
+
   return (
     <>
       <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;1,300&family=Josefin+Sans:wght@400;500;600&display=swap');
+        @import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;1,300;1,400&family=Outfit:wght@300;400;500&display=swap');
 
+        /* ── Trigger ── */
         .mm-trigger {
           position: relative;
-          display: flex;
+          display: inline-flex;
           align-items: center;
-          gap: 5px;
+          gap: 6px;
           cursor: pointer;
-          padding: 4px 0;
-          color: var(--text-secondary);
+          padding: 6px 2px;
+          color: var(--text-secondary, #555);
           font-size: 0.7rem;
           letter-spacing: 0.15em;
           text-transform: uppercase;
-          text-decoration: none;
-          transition: opacity 0.2s;
-          font-family: 'Josefin Sans', sans-serif;
-          font-weight: 500;
+          font-family: 'Outfit', sans-serif;
+          font-weight: 400;
           background: none;
           border: none;
+          transition: opacity 0.2s;
         }
+        .mm-trigger:hover { opacity: 0.55; }
+        .mm-trigger:disabled { opacity: 0.35; cursor: default; }
 
-        .mm-trigger:hover { opacity: 0.6; }
-
-        .mm-trigger:disabled {
-          opacity: 0.4;
-          cursor: default;
+        .mm-trigger-underline {
+          position: absolute;
+          bottom: 2px; left: 0;
+          height: 1px; width: 100%;
+          background: currentColor;
+          transform: scaleX(0);
+          transform-origin: left;
+          transition: transform 0.3s cubic-bezier(0.4,0,0.2,1);
+          opacity: 0.3;
         }
+        .mm-trigger:not(:disabled):hover .mm-trigger-underline { transform: scaleX(1); }
 
         .mm-chevron {
-          width: 8px; height: 8px;
-          border-right: 1px solid currentColor;
-          border-bottom: 1px solid currentColor;
-          transform: rotate(45deg) translateY(-2px);
-          transition: transform 0.25s ease;
-          opacity: 0.6;
-          margin-top: 1px;
-        }
-
-        .mm-chevron.open {
-          transform: rotate(-135deg) translateY(-2px);
-        }
-
-        /* ── Loading shimmer ── */
-        @keyframes mmShimmer {
-          0%   { background-position: -400px 0; }
-          100% { background-position:  400px 0; }
-        }
-
-        .mm-loading-bar {
-          display: inline-block;
-          width: 72px;
-          height: 8px;
-          border-radius: 4px;
-          background: linear-gradient(90deg,
-            var(--border, #e8e0d0) 25%,
-            var(--bg, #faf9f7) 50%,
-            var(--border, #e8e0d0) 75%
-          );
-          background-size: 400px 100%;
-          animation: mmShimmer 1.4s infinite linear;
-        }
-
-        /* ── Dropdown panel ── */
-        .mm-panel {
-          position: fixed;
-          left: 0; right: 0;
-          z-index: 49;
-          background: var(--surface, #fff);
-          border-bottom: 1px solid var(--border, #e8e0d0);
-          box-shadow: 0 24px 60px rgba(0,0,0,0.10), 0 4px 12px rgba(0,0,0,0.04);
-          display: grid;
-          grid-template-columns: 260px 1fr;
-          overflow: hidden;
-          transform-origin: top center;
-          transition: opacity 0.22s ease, transform 0.22s cubic-bezier(0.22,1,0.36,1);
-        }
-
-        .mm-panel.closed {
-          opacity: 0;
-          transform: translateY(-8px) scaleY(0.97);
-          pointer-events: none;
-        }
-
-        .mm-panel.opened {
-          opacity: 1;
-          transform: translateY(0) scaleY(1);
-          pointer-events: auto;
-        }
-
-        /* ── Left: category list ── */
-        .mm-left {
-          padding: 28px 0;
-          border-right: 1px solid var(--border, #e8e0d0);
-          background: var(--bg, #faf9f7);
-        }
-
-        .mm-left-header {
-          font-family: 'Josefin Sans', sans-serif;
-          font-size: 0.58rem;
-          font-weight: 600;
-          letter-spacing: 0.22em;
-          text-transform: uppercase;
-          color: var(--muted, #9a8e7e);
-          padding: 0 28px 16px;
-          border-bottom: 1px solid var(--border, #e8e0d0);
-          margin-bottom: 8px;
-        }
-
-        .mm-cat-item {
-          display: flex;
-          align-items: center;
-          gap: 12px;
-          padding: 11px 28px;
-          cursor: pointer;
-          transition: background 0.15s;
-          position: relative;
-        }
-
-        .mm-cat-item:hover,
-        .mm-cat-item.active {
-          background: var(--surface, #fff);
-        }
-
-        .mm-cat-item.active::before {
-          content: '';
-          position: absolute;
-          left: 0; top: 8px; bottom: 8px;
-          width: 2px;
-          background: var(--gold, #b8922a);
-          border-radius: 0 2px 2px 0;
-        }
-
-        .mm-cat-icon {
-          font-size: 13px;
-          color: var(--gold, #b8922a);
-          width: 18px;
-          text-align: center;
+          width: 7px; height: 7px;
+          border-right: 1.5px solid currentColor;
+          border-bottom: 1.5px solid currentColor;
+          transform: rotate(45deg) translateY(-1px);
+          transition: transform 0.3s cubic-bezier(0.4,0,0.2,1);
+          opacity: 0.5;
+          margin-top: 2px;
           flex-shrink: 0;
-          transition: transform 0.2s;
+        }
+        .mm-chevron.open { transform: rotate(-135deg) translateY(1px); }
+
+        /* ── Shimmer ── */
+        @keyframes mmShimmer {
+          0%   { background-position: -300px 0; }
+          100% { background-position:  300px 0; }
+        }
+        .mm-loading-bar {
+          display: inline-block; width: 60px; height: 7px; border-radius: 3px;
+          background: linear-gradient(90deg, #e8e4de 25%, #f5f3ef 50%, #e8e4de 75%);
+          background-size: 300px 100%;
+          animation: mmShimmer 1.3s infinite linear;
         }
 
-        .mm-cat-item.active .mm-cat-icon,
-        .mm-cat-item:hover .mm-cat-icon {
-          transform: scale(1.2);
+        /* ── Backdrop ── */
+        .mm-backdrop {
+          position: fixed; inset: 0; z-index: 48;
+          background: rgba(30,20,10,0.18);
+          backdrop-filter: blur(1px);
+          transition: opacity 0.25s ease;
         }
+        .mm-backdrop.closed { opacity: 0; pointer-events: none; }
+        .mm-backdrop.opened { opacity: 1; pointer-events: auto; }
 
-        .mm-cat-label {
-          font-family: 'Josefin Sans', sans-serif;
-          font-size: 0.72rem;
-          font-weight: 500;
-          letter-spacing: 0.12em;
-          text-transform: uppercase;
-          color: var(--text, #1a1612);
-          transition: color 0.15s;
+        /* ── Panel ── */
+        .mm-panel {
+          position: fixed; left: 0; right: 0; z-index: 49;
+          display: grid;
+          grid-template-columns: 200px 1fr 280px;
+          min-height: 400px;
+          overflow: hidden;
+          box-shadow: 0 20px 60px rgba(0,0,0,0.10), 0 1px 0 rgba(0,0,0,0.06);
+          border-bottom: 1px solid rgba(0,0,0,0.07);
+          transition: opacity 0.28s ease, transform 0.28s cubic-bezier(0.22,1,0.36,1);
+          transform-origin: top center;
         }
+        .mm-panel.closed { opacity: 0; transform: translateY(-10px) scaleY(0.97); pointer-events: none; }
+        .mm-panel.opened { opacity: 1; transform: translateY(0) scaleY(1); pointer-events: auto; }
 
-        .mm-cat-item.active .mm-cat-label { color: var(--gold, #b8922a); }
-
-        .mm-cat-arrow {
-          margin-left: auto;
-          font-size: 10px;
-          color: var(--muted, #9a8e7e);
-          opacity: 0;
-          transition: opacity 0.15s, transform 0.15s;
-        }
-
-        .mm-cat-item.active .mm-cat-arrow,
-        .mm-cat-item:hover .mm-cat-arrow {
-          opacity: 1;
-          transform: translateX(3px);
-        }
-
-        /* ── Right: subcategory panel ── */
-        .mm-right {
-          padding: 32px 40px 36px;
+        /* ── Left rail: category tabs ── */
+        .mm-rail {
+          background: #faf9f7;
+          border-right: 1px solid rgba(0,0,0,0.07);
+          padding: 32px 0;
           display: flex;
           flex-direction: column;
         }
-
-        .mm-right-header {
-          display: flex;
-          align-items: baseline;
-          gap: 16px;
-          margin-bottom: 24px;
-          padding-bottom: 18px;
-          border-bottom: 1px solid var(--border, #e8e0d0);
-        }
-
-        .mm-right-title {
-          font-family: 'Cormorant Garamond', serif;
-          font-size: 26px;
-          font-weight: 300;
-          color: var(--text, #1a1612);
-          line-height: 1;
-        }
-
-        .mm-right-desc {
-          font-family: 'Josefin Sans', sans-serif;
-          font-size: 0.62rem;
-          letter-spacing: 0.12em;
-          color: var(--muted, #9a8e7e);
+        .mm-rail-eyebrow {
+          font-family: 'Outfit', sans-serif;
+          font-size: 0.55rem;
+          letter-spacing: 0.22em;
           text-transform: uppercase;
+          color: rgba(0,0,0,0.25);
+          padding: 0 20px 18px;
         }
-
-        .mm-right-viewall {
-          margin-left: auto;
-          font-family: 'Josefin Sans', sans-serif;
-          font-size: 0.62rem;
-          letter-spacing: 0.15em;
-          text-transform: uppercase;
-          color: var(--gold, #b8922a);
-          text-decoration: none;
+        .mm-rail-item {
+          position: relative;
           display: flex;
           align-items: center;
-          gap: 5px;
-          transition: opacity 0.2s;
-          white-space: nowrap;
+          gap: 10px;
+          padding: 11px 20px;
+          cursor: pointer;
+          transition: background 0.18s;
+          overflow: hidden;
+        }
+        .mm-rail-item:hover { background: rgba(0,0,0,0.025); }
+        .mm-rail-item.active { background: #ffffff; }
+
+        .mm-rail-indicator {
+          position: absolute;
+          left: 0; top: 50%; transform: translateY(-50%);
+          width: 2px; height: 0;
+          border-radius: 0 2px 2px 0;
+          transition: height 0.22s cubic-bezier(0.4,0,0.2,1), background 0.3s;
+        }
+        .mm-rail-item.active .mm-rail-indicator { height: 28px; }
+
+        .mm-rail-num {
+          font-family: 'Cormorant Garamond', serif;
+          font-size: 0.62rem;
+          color: rgba(0,0,0,0.18);
+          width: 14px;
           flex-shrink: 0;
+          font-style: italic;
+          transition: color 0.18s;
+        }
+        .mm-rail-item.active .mm-rail-num { color: rgba(0,0,0,0.4); }
+
+        .mm-rail-label {
+          font-family: 'Outfit', sans-serif;
+          font-size: 0.72rem;
+          font-weight: 400;
+          letter-spacing: 0.03em;
+          color: rgba(0,0,0,0.4);
+          transition: color 0.18s;
+          line-height: 1.2;
+        }
+        .mm-rail-item.active .mm-rail-label { color: rgba(0,0,0,0.85); font-weight: 500; }
+        .mm-rail-item:hover .mm-rail-label { color: rgba(0,0,0,0.65); }
+
+        .mm-rail-count {
+          margin-left: auto;
+          font-family: 'Outfit', sans-serif;
+          font-size: 0.56rem;
+          color: rgba(0,0,0,0.18);
+          transition: color 0.18s;
+        }
+        .mm-rail-item.active .mm-rail-count { color: rgba(0,0,0,0.35); }
+
+        /* ── Centre ── */
+        .mm-centre {
+          display: flex;
+          flex-direction: column;
+          padding: 36px 40px 36px;
+          position: relative;
+          overflow: hidden;
+          transition: background 0.45s ease;
         }
 
-        .mm-right-viewall:hover { opacity: 0.65; }
+        /* Subtle paper grain */
+        .mm-centre::after {
+          content: '';
+          position: absolute; inset: 0; z-index: 0;
+          opacity: 0.018;
+          background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+          background-size: 180px;
+          pointer-events: none;
+        }
+        .mm-centre > * { position: relative; z-index: 1; }
 
-        /* ── Subcategory grid ── */
+        .mm-cat-hero {
+          margin-bottom: 24px;
+          padding-bottom: 22px;
+          border-bottom: 1px solid rgba(0,0,0,0.07);
+        }
+        .mm-cat-hero-label {
+          font-family: 'Outfit', sans-serif;
+          font-size: 0.58rem;
+          letter-spacing: 0.2em;
+          text-transform: uppercase;
+          color: rgba(0,0,0,0.3);
+          margin-bottom: 8px;
+          display: flex;
+          align-items: center;
+          gap: 8px;
+        }
+        .mm-cat-hero-label::after {
+          content: '';
+          flex: 1;
+          height: 1px;
+          background: rgba(0,0,0,0.08);
+        }
+
+        .mm-cat-title {
+          font-family: 'Cormorant Garamond', serif;
+          font-size: clamp(28px, 3.5vw, 44px);
+          font-weight: 300;
+          color: rgba(0,0,0,0.85);
+          line-height: 1.05;
+          letter-spacing: -0.01em;
+          margin-bottom: 10px;
+        }
+        .mm-cat-title em {
+          font-style: italic;
+          color: rgba(0,0,0,0.45);
+        }
+
+        .mm-cat-desc {
+          font-family: 'Outfit', sans-serif;
+          font-size: 0.74rem;
+          font-weight: 300;
+          color: rgba(0,0,0,0.45);
+          line-height: 1.65;
+          max-width: 400px;
+          margin-bottom: 16px;
+        }
+
+        .mm-viewall-btn {
+          display: inline-flex;
+          align-items: center;
+          gap: 8px;
+          font-family: 'Outfit', sans-serif;
+          font-size: 0.66rem;
+          letter-spacing: 0.1em;
+          color: rgba(0,0,0,0.55);
+          text-decoration: none;
+          border: 1px solid rgba(0,0,0,0.15);
+          padding: 7px 16px;
+          border-radius: 2px;
+          transition: all 0.2s;
+          width: fit-content;
+          background: #ffffff;
+        }
+        .mm-viewall-btn:hover {
+          border-color: rgba(0,0,0,0.35);
+          color: rgba(0,0,0,0.85);
+          background: rgba(0,0,0,0.02);
+        }
+        .mm-viewall-arrow { display: inline-block; transition: transform 0.2s; }
+        .mm-viewall-btn:hover .mm-viewall-arrow { transform: translateX(4px); }
+
+        /* ── Sub-grid ── */
         .mm-subgrid {
           display: grid;
-          grid-template-columns: repeat(auto-fill, minmax(170px, 1fr));
-          gap: 4px;
+          grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+          gap: 2px;
+          margin-top: 4px;
         }
 
-        .mm-sub-item {
+        @keyframes mmSubIn {
+          from { opacity: 0; transform: translateY(8px); }
+          to   { opacity: 1; transform: translateY(0); }
+        }
+
+        .mm-sub-link {
           display: flex;
           flex-direction: column;
           gap: 3px;
           padding: 12px 14px;
-          border-radius: 3px;
           text-decoration: none;
-          transition: background 0.15s, transform 0.15s;
+          border-radius: 2px;
           border: 1px solid transparent;
-          animation: mmSubIn 0.22s ease both;
+          transition: background 0.16s, border-color 0.16s, transform 0.16s;
+          animation: mmSubIn 0.26s ease both;
+          position: relative;
+          overflow: hidden;
         }
-
-        .mm-sub-item:hover {
-          background: var(--bg, #faf9f7);
-          border-color: var(--border, #e8e0d0);
+        .mm-sub-link::before {
+          content: '';
+          position: absolute;
+          left: 0; top: 0; bottom: 0;
+          width: 0;
+          border-radius: 0 2px 2px 0;
+          transition: width 0.18s;
+        }
+        .mm-sub-link:hover {
+          background: rgba(255,255,255,0.9);
+          border-color: rgba(0,0,0,0.08);
           transform: translateY(-1px);
+          box-shadow: 0 2px 12px rgba(0,0,0,0.05);
         }
+        .mm-sub-link:hover::before { width: 2px; }
 
-        .mm-sub-label {
-          font-family: 'Josefin Sans', sans-serif;
-          font-size: 0.7rem;
-          font-weight: 500;
-          letter-spacing: 0.1em;
-          text-transform: uppercase;
-          color: var(--text, #1a1612);
-          display: flex;
-          align-items: center;
-          gap: 6px;
-          transition: color 0.15s;
+        .mm-sub-link:nth-child(1)  { animation-delay: 0.03s; }
+        .mm-sub-link:nth-child(2)  { animation-delay: 0.06s; }
+        .mm-sub-link:nth-child(3)  { animation-delay: 0.09s; }
+        .mm-sub-link:nth-child(4)  { animation-delay: 0.12s; }
+        .mm-sub-link:nth-child(5)  { animation-delay: 0.15s; }
+        .mm-sub-link:nth-child(6)  { animation-delay: 0.18s; }
+        .mm-sub-link:nth-child(7)  { animation-delay: 0.21s; }
+        .mm-sub-link:nth-child(8)  { animation-delay: 0.24s; }
+        .mm-sub-link:nth-child(9)  { animation-delay: 0.27s; }
+        .mm-sub-link:nth-child(10) { animation-delay: 0.30s; }
+
+        .mm-sub-name {
+          font-family: 'Outfit', sans-serif;
+          font-size: 0.72rem;
+          font-weight: 400;
+          letter-spacing: 0.02em;
+          color: rgba(0,0,0,0.55);
+          transition: color 0.16s;
+          line-height: 1.3;
         }
+        .mm-sub-link:hover .mm-sub-name { color: rgba(0,0,0,0.88); }
 
-        .mm-sub-item:hover .mm-sub-label { color: var(--gold, #b8922a); }
-
-        .mm-sub-dot {
-          width: 4px; height: 4px;
-          border-radius: 50%;
-          background: var(--gold, #b8922a);
-          opacity: 0.4;
-          flex-shrink: 0;
-          transition: opacity 0.15s;
-        }
-
-        .mm-sub-item:hover .mm-sub-dot { opacity: 1; }
-
-        .mm-sub-desc {
-          font-size: 0.68rem;
-          color: var(--muted, #9a8e7e);
-          line-height: 1.4;
-          padding-left: 10px;
-        }
-
-        /* ── Empty state ── */
-        .mm-empty {
+        .mm-sub-tagline {
           font-family: 'Cormorant Garamond', serif;
-          font-size: 18px;
-          font-weight: 300;
-          color: var(--muted, #9a8e7e);
+          font-size: 0.7rem;
           font-style: italic;
-          padding: 8px 0;
+          color: rgba(0,0,0,0.28);
+          line-height: 1.35;
+          transition: color 0.16s;
+        }
+        .mm-sub-link:hover .mm-sub-tagline { color: rgba(0,0,0,0.5); }
+
+        .mm-empty-state {
+          font-family: 'Cormorant Garamond', serif;
+          font-size: 1.05rem;
+          font-weight: 300;
+          font-style: italic;
+          color: rgba(0,0,0,0.25);
+          padding: 12px 0;
         }
 
-        @keyframes mmSubIn {
-          from { opacity: 0; transform: translateY(6px); }
-          to   { opacity: 1; transform: translateY(0); }
+        /* ── Ambient orb (light version) ── */
+        .mm-orb {
+          position: absolute;
+          border-radius: 50%;
+          filter: blur(70px);
+          pointer-events: none;
+          opacity: 0.18;
+          transition: background 0.5s ease;
+          z-index: 0;
         }
 
-        .mm-sub-item:nth-child(1) { animation-delay: 0.02s; }
-        .mm-sub-item:nth-child(2) { animation-delay: 0.05s; }
-        .mm-sub-item:nth-child(3) { animation-delay: 0.08s; }
-        .mm-sub-item:nth-child(4) { animation-delay: 0.11s; }
-        .mm-sub-item:nth-child(5) { animation-delay: 0.14s; }
-        .mm-sub-item:nth-child(6) { animation-delay: 0.17s; }
-        .mm-sub-item:nth-child(7) { animation-delay: 0.20s; }
-        .mm-sub-item:nth-child(8) { animation-delay: 0.23s; }
+        /* ── Right aside ── */
+        .mm-aside {
+          display: flex;
+          flex-direction: column;
+          border-left: 1px solid rgba(0,0,0,0.07);
+          padding: 36px 28px;
+          background: #faf9f7;
+          gap: 28px;
+        }
 
-        /* ── Bottom bar ── */
-        .mm-bottom {
-          margin-top: auto;
-          padding-top: 20px;
+        .mm-aside-section { display: flex; flex-direction: column; gap: 0; }
+
+        .mm-aside-eyebrow {
+          font-family: 'Outfit', sans-serif;
+          font-size: 0.54rem;
+          letter-spacing: 0.22em;
+          text-transform: uppercase;
+          color: rgba(0,0,0,0.28);
+          padding-bottom: 10px;
+          border-bottom: 1px solid rgba(0,0,0,0.07);
+          margin-bottom: 4px;
+        }
+
+        .mm-aside-quicklink {
           display: flex;
           align-items: center;
           justify-content: space-between;
-          border-top: 1px solid var(--border, #e8e0d0);
-        }
-
-        .mm-bottom-tag {
-          font-family: 'Josefin Sans', sans-serif;
-          font-size: 0.58rem;
-          letter-spacing: 0.18em;
-          text-transform: uppercase;
-          color: var(--muted, #9a8e7e);
-        }
-
-        .mm-bottom-links {
-          display: flex;
-          gap: 20px;
-        }
-
-        .mm-bottom-link {
-          font-family: 'Josefin Sans', sans-serif;
-          font-size: 0.6rem;
-          letter-spacing: 0.14em;
-          text-transform: uppercase;
-          color: var(--muted, #9a8e7e);
           text-decoration: none;
-          transition: color 0.15s;
+          padding: 9px 0;
+          border-bottom: 1px solid rgba(0,0,0,0.05);
+          transition: border-color 0.16s;
+          gap: 8px;
+        }
+        .mm-aside-quicklink:hover { border-color: rgba(0,0,0,0.15); }
+
+        .mm-aside-ql-text {
+          font-family: 'Outfit', sans-serif;
+          font-size: 0.71rem;
+          font-weight: 300;
+          color: rgba(0,0,0,0.5);
+          transition: color 0.16s;
+          line-height: 1.35;
+        }
+        .mm-aside-quicklink:hover .mm-aside-ql-text { color: rgba(0,0,0,0.85); }
+
+        .mm-aside-ql-arrow {
+          font-size: 11px;
+          color: rgba(0,0,0,0.2);
+          transition: color 0.16s, transform 0.16s;
+          flex-shrink: 0;
+        }
+        .mm-aside-quicklink:hover .mm-aside-ql-arrow {
+          color: rgba(0,0,0,0.5);
+          transform: translateX(3px);
         }
 
-        .mm-bottom-link:hover { color: var(--gold, #b8922a); }
+        .mm-aside-sig {
+          margin-top: auto;
+          border-top: 1px solid rgba(0,0,0,0.07);
+          padding-top: 18px;
+        }
+        .mm-aside-sig-text {
+          font-family: 'Cormorant Garamond', serif;
+          font-size: 0.8rem;
+          font-style: italic;
+          color: rgba(0,0,0,0.28);
+          line-height: 1.55;
+        }
+        .mm-aside-sig-mark {
+          display: inline-block;
+          font-style: normal;
+          font-size: 0.95rem;
+          margin-right: 5px;
+          color: rgba(0,0,0,0.22);
+        }
 
-        /* ── Backdrop ── */
-        .mm-backdrop {
+        /* ── Mobile trigger ── */
+        .mm-mobile-trigger {
+          display: none;
+          align-items: center;
+          gap: 6px;
+          cursor: pointer;
+          padding: 6px 2px;
+          color: var(--text-secondary, #555);
+          font-size: 0.7rem;
+          letter-spacing: 0.15em;
+          text-transform: uppercase;
+          font-family: 'Outfit', sans-serif;
+          font-weight: 400;
+          background: none;
+          border: none;
+          transition: opacity 0.2s;
+        }
+        .mm-mobile-trigger:hover { opacity: 0.6; }
+
+        /* ── Mobile drawer ── */
+        .mm-mobile-drawer {
           position: fixed;
           inset: 0;
-          z-index: 48;
-          background: rgba(0,0,0,0.18);
-          transition: opacity 0.22s ease;
+          z-index: 200;
+          background: #ffffff;
+          display: flex;
+          flex-direction: column;
+          overflow-y: auto;
+          transition: opacity 0.28s ease, transform 0.28s cubic-bezier(0.22,1,0.36,1);
+          transform-origin: top;
+        }
+        .mm-mobile-drawer.closed { opacity: 0; transform: translateY(-8px); pointer-events: none; }
+        .mm-mobile-drawer.opened { opacity: 1; transform: translateY(0); pointer-events: auto; }
+
+        .mm-mobile-header {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          padding: 16px 20px;
+          border-bottom: 1px solid rgba(0,0,0,0.08);
+          position: sticky;
+          top: 0;
+          background: #ffffff;
+          z-index: 10;
+        }
+        .mm-mobile-header-title {
+          font-family: 'Outfit', sans-serif;
+          font-size: 0.6rem;
+          letter-spacing: 0.2em;
+          text-transform: uppercase;
+          color: rgba(0,0,0,0.4);
+        }
+        .mm-mobile-close {
+          display: flex; align-items: center; justify-content: center;
+          width: 32px; height: 32px;
+          background: none; border: none; cursor: pointer;
+          color: rgba(0,0,0,0.5);
+          transition: opacity 0.2s;
+        }
+        .mm-mobile-close:hover { opacity: 0.5; }
+
+        /* Category accordion */
+        .mm-mob-cat {
+          border-bottom: 1px solid rgba(0,0,0,0.07);
+        }
+        .mm-mob-cat-header {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          padding: 16px 20px;
+          cursor: pointer;
+          transition: background 0.16s;
+        }
+        .mm-mob-cat-header:hover { background: rgba(0,0,0,0.02); }
+        .mm-mob-cat-header.open { background: rgba(0,0,0,0.025); }
+
+        .mm-mob-cat-info { display: flex; align-items: center; gap: 10px; }
+        .mm-mob-cat-dot {
+          width: 6px; height: 6px; border-radius: 50%;
+          flex-shrink: 0;
+        }
+        .mm-mob-cat-name {
+          font-family: 'Outfit', sans-serif;
+          font-size: 0.82rem;
+          font-weight: 400;
+          color: rgba(0,0,0,0.75);
+          letter-spacing: 0.02em;
+        }
+        .mm-mob-cat-count {
+          font-family: 'Outfit', sans-serif;
+          font-size: 0.6rem;
+          color: rgba(0,0,0,0.3);
+        }
+        .mm-mob-chevron {
+          width: 8px; height: 8px;
+          border-right: 1.5px solid rgba(0,0,0,0.3);
+          border-bottom: 1.5px solid rgba(0,0,0,0.3);
+          transform: rotate(45deg) translateY(-2px);
+          transition: transform 0.22s;
+        }
+        .mm-mob-chevron.open { transform: rotate(-135deg) translateY(2px); }
+
+        .mm-mob-subs {
+          overflow: hidden;
+          transition: max-height 0.32s cubic-bezier(0.4,0,0.2,1);
+          max-height: 0;
+        }
+        .mm-mob-subs.open { max-height: 800px; }
+
+        .mm-mob-browse-all {
+          display: flex;
+          align-items: center;
+          gap: 6px;
+          padding: 12px 20px 12px 36px;
+          font-family: 'Outfit', sans-serif;
+          font-size: 0.72rem;
+          font-weight: 500;
+          letter-spacing: 0.04em;
+          text-decoration: none;
+          color: rgba(0,0,0,0.65);
+          border-bottom: 1px solid rgba(0,0,0,0.05);
+          transition: background 0.14s;
+        }
+        .mm-mob-browse-all:hover { background: rgba(0,0,0,0.03); }
+
+        .mm-mob-sub-link {
+          display: flex;
+          flex-direction: column;
+          padding: 11px 20px 11px 36px;
+          text-decoration: none;
+          border-bottom: 1px solid rgba(0,0,0,0.04);
+          transition: background 0.14s;
+        }
+        .mm-mob-sub-link:hover { background: rgba(0,0,0,0.025); }
+        .mm-mob-sub-name {
+          font-family: 'Outfit', sans-serif;
+          font-size: 0.75rem;
+          color: rgba(0,0,0,0.6);
+          letter-spacing: 0.02em;
+          line-height: 1.3;
+        }
+        .mm-mob-sub-desc {
+          font-family: 'Cormorant Garamond', serif;
+          font-size: 0.72rem;
+          font-style: italic;
+          color: rgba(0,0,0,0.3);
         }
 
-        .mm-backdrop.closed { opacity: 0; pointer-events: none; }
-        .mm-backdrop.opened { opacity: 1; pointer-events: auto; }
+        /* Mobile quick links */
+        .mm-mob-quicklinks {
+          padding: 24px 20px 0;
+        }
+        .mm-mob-quicklinks-title {
+          font-family: 'Outfit', sans-serif;
+          font-size: 0.54rem;
+          letter-spacing: 0.2em;
+          text-transform: uppercase;
+          color: rgba(0,0,0,0.3);
+          margin-bottom: 12px;
+        }
+        .mm-mob-ql-link {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          padding: 10px 0;
+          text-decoration: none;
+          border-bottom: 1px solid rgba(0,0,0,0.05);
+          font-family: 'Outfit', sans-serif;
+          font-size: 0.74rem;
+          color: rgba(0,0,0,0.5);
+          transition: color 0.14s;
+        }
+        .mm-mob-ql-link:hover { color: rgba(0,0,0,0.85); }
+
+        .mm-mob-footer {
+          padding: 28px 20px;
+          margin-top: auto;
+          border-top: 1px solid rgba(0,0,0,0.06);
+        }
+        .mm-mob-footer-text {
+          font-family: 'Cormorant Garamond', serif;
+          font-size: 0.85rem;
+          font-style: italic;
+          color: rgba(0,0,0,0.28);
+          line-height: 1.5;
+        }
+
+        /* Responsive breakpoints */
+        @media (min-width: 768px) {
+          .mm-trigger { display: inline-flex !important; }
+          .mm-mobile-trigger { display: none !important; }
+        }
+        @media (max-width: 767px) {
+          .mm-trigger { display: none !important; }
+          .mm-mobile-trigger { display: inline-flex !important; }
+          .mm-backdrop, .mm-panel { display: none !important; }
+        }
+
+        /* Tablet: collapse aside on smaller desktops */
+        @media (min-width: 768px) and (max-width: 1024px) {
+          .mm-panel { grid-template-columns: 180px 1fr; }
+          .mm-aside { display: none; }
+          .mm-centre { padding: 28px 32px; }
+          .mm-rail { padding: 24px 0; }
+          .mm-subgrid { grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); }
+        }
       `}</style>
 
-      <div ref={menuRef} onMouseEnter={handleMouseEnter} onMouseLeave={handleMouseLeave}>
-        {/* Trigger button — disabled while loading or errored */}
+      {/* ── Desktop wrapper ── */}
+      <div ref={menuRef} onMouseEnter={handleMouseEnter} onMouseLeave={handleMouseLeave} className="mm-desktop-wrapper">
         <button
           className="mm-trigger"
           aria-expanded={open}
           disabled={loading || error}
+          style={{ color: 'var(--text-secondary, #666)' }}
         >
           {loading ? (
             <span className="mm-loading-bar" />
+          ) : error ? (
+            'Collections'
           ) : (
             <>
-              Collection
+              Collections
               <span className={`mm-chevron ${open ? 'open' : ''}`} />
+              <span className="mm-trigger-underline" />
             </>
           )}
         </button>
 
-        {/* Backdrop */}
         <div
           className={`mm-backdrop ${open && !loading && !error ? 'opened' : 'closed'}`}
           onClick={() => setOpen(false)}
         />
 
-        {/* Panel — only rendered once data is ready */}
         {!loading && !error && activeCategory && (
-          <MegaPanel
+          <PanelInner
             open={open}
             categories={categories}
-            activeCategory={activeCategory}
-            onCategoryHover={setActiveCategory}
+            activeIdx={activeIdx}
+            palette={palette}
+            onCategoryHover={setActiveIdx}
             onClose={() => setOpen(false)}
           />
         )}
+      </div>
+
+      {/* ── Mobile trigger ── */}
+      <button
+        className="mm-mobile-trigger"
+        onClick={() => setMobileOpen(true)}
+        style={{ color: 'var(--text-secondary, #666)' }}
+      >
+        Collections
+        <span className="mm-chevron" style={{ marginTop: '2px' }} />
+      </button>
+
+      {/* ── Mobile drawer ── */}
+      <div className={`mm-mobile-drawer ${mobileOpen ? 'opened' : 'closed'}`}>
+        <div className="mm-mobile-header">
+          <span className="mm-mobile-header-title">Collections</span>
+          <button className="mm-mobile-close" onClick={() => { setMobileOpen(false); setMobileCatIdx(null); }}>
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+              <path d="M2 2L14 14M14 2L2 14" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+            </svg>
+          </button>
+        </div>
+
+        {loading && (
+          <div style={{ padding: '24px 20px', display: 'flex', flexDirection: 'column', gap: 12 }}>
+            {[1,2,3,4].map(i => <span key={i} className="mm-loading-bar" style={{ width: `${60 + i * 20}px`, height: 10 }} />)}
+          </div>
+        )}
+
+        {!loading && !error && categories.map((cat, i) => {
+          const p = CATEGORY_PALETTE[i % CATEGORY_PALETTE.length];
+          const isOpen = mobileCatIdx === i;
+          return (
+            <div key={cat.slug} className="mm-mob-cat">
+              <div
+                className={`mm-mob-cat-header ${isOpen ? 'open' : ''}`}
+                onClick={() => setMobileCatIdx(isOpen ? null : i)}
+              >
+                <div className="mm-mob-cat-info">
+                  <span className="mm-mob-cat-dot" style={{ background: p.accent }} />
+                  <span className="mm-mob-cat-name">{cat.label}</span>
+                  <span className="mm-mob-cat-count">{cat.subcategories.length}</span>
+                </div>
+                <span className={`mm-mob-chevron ${isOpen ? 'open' : ''}`} />
+              </div>
+
+              <div className={`mm-mob-subs ${isOpen ? 'open' : ''}`}>
+                <Link
+                  href={cat.href}
+                  className="mm-mob-browse-all"
+                  onClick={() => setMobileOpen(false)}
+                  style={{ color: p.accent }}
+                >
+                  Browse all {cat.label} →
+                </Link>
+                {cat.subcategories.map(sub => (
+                  <Link
+                    key={sub.slug}
+                    href={sub.href}
+                    className="mm-mob-sub-link"
+                    onClick={() => setMobileOpen(false)}
+                  >
+                    <span className="mm-mob-sub-name">{sub.label}</span>
+                    {sub.description && <span className="mm-mob-sub-desc">{sub.description}</span>}
+                  </Link>
+                ))}
+              </div>
+            </div>
+          );
+        })}
+
+        {/* Quick links */}
+        {!loading && !error && (
+          <div className="mm-mob-quicklinks">
+            <div className="mm-mob-quicklinks-title">Quick access</div>
+            {[
+              { label: 'New arrivals', href: '/products?new=true' },
+              { label: 'GIA certified stones', href: '/products?certified=true' },
+              { label: 'Under ₹50,000', href: '/products?sort=price_asc&max=50000' },
+              { label: 'Understanding the 4 Cs', href: '/guide/4cs' },
+            ].map(l => (
+              <Link key={l.href} href={l.href} className="mm-mob-ql-link" onClick={() => setMobileOpen(false)}>
+                <span>{l.label}</span>
+                <span style={{ fontSize: 12, opacity: 0.4 }}>›</span>
+              </Link>
+            ))}
+          </div>
+        )}
+
+        <div className="mm-mob-footer">
+          <p className="mm-mob-footer-text">◆ Fine diamonds & gemstones, curated for discerning eyes.</p>
+        </div>
       </div>
     </>
   );
 }
 
-// ─── Panel sub-component ──────────────────────────────────────────────────────
-function MegaPanel({
+// ─── Desktop Panel ────────────────────────────────────────────────────────────
+function PanelInner({
   open,
   categories,
-  activeCategory,
+  activeIdx,
+  palette,
   onCategoryHover,
   onClose,
 }: {
   open: boolean;
   categories: Category[];
-  activeCategory: Category;
-  onCategoryHover: (c: Category) => void;
+  activeIdx: number;
+  palette: { bg: string; accent: string; dim: string; tint: string };
+  onCategoryHover: (i: number) => void;
   onClose: () => void;
 }) {
   const [panelTop, setPanelTop] = useState(0);
@@ -528,72 +892,117 @@ function MegaPanel({
     return () => window.removeEventListener('scroll', update);
   }, []);
 
+  const cat = categories[activeIdx];
+  const subCount = cat.subcategories.length;
+  const countLabel = subCount === 0
+    ? 'Explore the full collection'
+    : subCount === 1 ? '1 style available' : `${subCount} styles to explore`;
+
+  const words = cat.label.split(' ');
+  const titleDisplay = words.length > 1
+    ? <>{words.slice(0, -1).join(' ')} <em>{words[words.length - 1]}</em></>
+    : cat.label;
+
   return (
-    <div
-      className={`mm-panel ${open ? 'opened' : 'closed'}`}
-      style={{ top: panelTop }}
-    >
-      {/* Left: category list from MongoDB */}
-      <div className="mm-left">
-        <div className="mm-left-header">Browse by</div>
-        {categories.map((cat, i) => (
-          <div
-            key={cat.slug}
-            className={`mm-cat-item ${activeCategory.slug === cat.slug ? 'active' : ''}`}
-            onMouseEnter={() => onCategoryHover(cat)}
-          >
-            <span className="mm-cat-icon">
-              {CATEGORY_ICONS[i % CATEGORY_ICONS.length]}
-            </span>
-            <span className="mm-cat-label">{cat.label}</span>
-            <span className="mm-cat-arrow">›</span>
-          </div>
-        ))}
+    <div className={`mm-panel ${open ? 'opened' : 'closed'}`} style={{ top: panelTop }}>
+
+      {/* Rail */}
+      <div className="mm-rail">
+        <div className="mm-rail-eyebrow">Collections</div>
+        {categories.map((c, i) => {
+          const p = CATEGORY_PALETTE[i % CATEGORY_PALETTE.length];
+          return (
+            <div
+              key={c.slug}
+              className={`mm-rail-item ${i === activeIdx ? 'active' : ''}`}
+              onMouseEnter={() => onCategoryHover(i)}
+            >
+              <span
+                className="mm-rail-indicator"
+                style={{ background: i === activeIdx ? p.accent : 'transparent' }}
+              />
+              <span className="mm-rail-num">{String(i + 1).padStart(2, '0')}</span>
+              <span className="mm-rail-label">{c.label}</span>
+              <span className="mm-rail-count">{c.subcategories.length}</span>
+            </div>
+          );
+        })}
       </div>
 
-      {/* Right: subcategories for the hovered category */}
-      <div className="mm-right">
-        <div className="mm-right-header">
-          <span className="mm-right-title">{activeCategory.label}</span>
-          {activeCategory.description && (
-            <span className="mm-right-desc">{activeCategory.description}</span>
-          )}
-          <Link href={activeCategory.href} className="mm-right-viewall" onClick={onClose}>
-            View all →
+      {/* Centre */}
+      <div className="mm-centre" style={{ background: palette.bg }}>
+        {/* Ambient orb */}
+        <span
+          className="mm-orb"
+          style={{ width: 300, height: 300, top: -80, right: -60, background: palette.accent }}
+        />
+
+        <div className="mm-cat-hero">
+          <div className="mm-cat-hero-label">{countLabel}</div>
+          <h2 className="mm-cat-title">{titleDisplay}</h2>
+          {cat.description && <p className="mm-cat-desc">{cat.description}</p>}
+          <Link
+            href={cat.href}
+            className="mm-viewall-btn"
+            onClick={onClose}
+            style={{ borderColor: `${palette.accent}55`, color: palette.accent }}
+          >
+            Browse all {cat.label.toLowerCase()}
+            <span className="mm-viewall-arrow">→</span>
           </Link>
         </div>
 
-        {activeCategory.subcategories.length === 0 ? (
-          <p className="mm-empty">No subcategories yet.</p>
+        {cat.subcategories.length === 0 ? (
+          <p className="mm-empty-state">The full collection awaits.</p>
         ) : (
-          // key forces re-animation when active category changes
-          <div className="mm-subgrid" key={activeCategory.slug}>
-            {activeCategory.subcategories.map((sub) => (
-              <Link
-                key={sub.slug}
-                href={sub.href}
-                className="mm-sub-item"
-                onClick={onClose}
-              >
-                <span className="mm-sub-label">
-                  <span className="mm-sub-dot" />
-                  {sub.label}
-                </span>
-                {sub.description && (
-                  <span className="mm-sub-desc">{sub.description}</span>
-                )}
+          <div className="mm-subgrid" key={cat.slug}>
+            {cat.subcategories.map((sub) => (
+              <Link key={sub.slug} href={sub.href} className="mm-sub-link" onClick={onClose}>
+                <style>{`.mm-sub-link:hover::before { background: ${palette.accent}; }`}</style>
+                <span className="mm-sub-name">{sub.label}</span>
+                {sub.description && <span className="mm-sub-tagline">{sub.description}</span>}
               </Link>
             ))}
           </div>
         )}
+      </div>
 
-        <div className="mm-bottom">
-          <span className="mm-bottom-tag">◆ Alpha Imports — Fine Diamonds & Gemstones</span>
-          <div className="mm-bottom-links">
-            <Link href="/products?new=true" className="mm-bottom-link" onClick={onClose}>New arrivals</Link>
-            <Link href="/products?certified=true" className="mm-bottom-link" onClick={onClose}>Certified only</Link>
-            <Link href="/products?sort=price_asc" className="mm-bottom-link" onClick={onClose}>Price: low–high</Link>
-          </div>
+      {/* Aside */}
+      <div className="mm-aside">
+        <div className="mm-aside-section">
+          <div className="mm-aside-eyebrow">Quick access</div>
+          {[
+            { label: 'New arrivals', href: '/products?new=true' },
+            { label: 'GIA certified stones', href: '/products?certified=true' },
+            { label: 'Under ₹50,000', href: '/products?sort=price_asc&max=50000' },
+            { label: 'Featured pieces', href: '/products?featured=true' },
+          ].map((l) => (
+            <Link key={l.href} href={l.href} className="mm-aside-quicklink" onClick={onClose}>
+              <span className="mm-aside-ql-text">{l.label}</span>
+              <span className="mm-aside-ql-arrow">›</span>
+            </Link>
+          ))}
+        </div>
+
+        <div className="mm-aside-section">
+          <div className="mm-aside-eyebrow">Need guidance?</div>
+          {[
+            { label: 'How to read a gem report', href: '/guide/gem-reports' },
+            { label: 'Understanding the 4 Cs', href: '/guide/4cs' },
+            { label: 'Natural vs lab-grown', href: '/guide/natural-vs-lab' },
+          ].map((l) => (
+            <Link key={l.href} href={l.href} className="mm-aside-quicklink" onClick={onClose}>
+              <span className="mm-aside-ql-text">{l.label}</span>
+              <span className="mm-aside-ql-arrow">›</span>
+            </Link>
+          ))}
+        </div>
+
+        <div className="mm-aside-sig">
+          <p className="mm-aside-sig-text">
+            <span className="mm-aside-sig-mark">◆</span>
+            Fine diamonds &amp; gemstones, curated for discerning eyes.
+          </p>
         </div>
       </div>
     </div>

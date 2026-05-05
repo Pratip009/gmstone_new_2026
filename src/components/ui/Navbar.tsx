@@ -2,7 +2,7 @@
 import Link from 'next/link';
 import { useAuth } from '@/hooks/useAuth';
 import { useRouter } from 'next/navigation';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import MegaMenu from '@/components/ui/MegaMenu';
 
 export default function Navbar() {
@@ -10,6 +10,8 @@ export default function Navbar() {
   const router = useRouter();
   const [scrolled, setScrolled] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
+  const [profileOpen, setProfileOpen] = useState(false);
+  const profileRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const handleScroll = () => setScrolled(window.scrollY > 20);
@@ -24,9 +26,21 @@ export default function Navbar() {
     return () => { document.body.style.overflow = ''; };
   }, [menuOpen]);
 
+  // Close profile dropdown on outside click
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (profileRef.current && !profileRef.current.contains(e.target as Node)) {
+        setProfileOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
   const handleLogout = () => {
     logout();
     setMenuOpen(false);
+    setProfileOpen(false);
     router.push('/');
   };
 
@@ -76,38 +90,115 @@ export default function Navbar() {
 
           {/* Desktop Nav Links */}
           <div className="hidden md:flex items-center gap-8">
-
-            {/* ── MegaMenu replaces plain Collection link ── */}
             <MegaMenu />
 
             {user ? (
               <>
-                <Link href="/cart" className="uppercase tracking-widest transition-opacity hover:opacity-60" style={navLinkStyle}>
+                <Link href="/cart" className="transition-opacity hover:opacity-60" style={navLinkStyle}>
                   Cart
                 </Link>
-                <Link href="/orders" className="uppercase tracking-widest transition-opacity hover:opacity-60" style={navLinkStyle}>
+                <Link href="/orders" className="transition-opacity hover:opacity-60" style={navLinkStyle}>
                   Orders
                 </Link>
                 {isAdmin && (
                   <Link
                     href="/admin"
-                    className="uppercase tracking-widest transition-opacity hover:opacity-60"
+                    className="transition-opacity hover:opacity-60"
                     style={{ color: 'var(--gold)', letterSpacing: '0.15em', fontSize: '0.7rem' }}
                   >
                     Admin
                   </Link>
                 )}
-                <div className="flex items-center gap-4 pl-6" style={{ borderLeft: '1px solid var(--border)' }}>
-                  <span style={{ color: 'var(--muted)', fontSize: '0.7rem', letterSpacing: '0.1em' }}>
-                    {user.name}
-                  </span>
+
+                {/* Profile Dropdown */}
+                <div
+                  ref={profileRef}
+                  className="relative pl-6"
+                  style={{ borderLeft: '1px solid var(--border)' }}
+                >
                   <button
-                    onClick={handleLogout}
-                    className="uppercase tracking-widest transition-opacity hover:opacity-60"
-                    style={{ color: 'var(--muted)', letterSpacing: '0.15em', fontSize: '0.7rem' }}
+                    onClick={() => setProfileOpen(!profileOpen)}
+                    className="flex items-center gap-2 transition-opacity hover:opacity-70"
+                    style={{ color: 'var(--text-secondary)', fontSize: '0.7rem', letterSpacing: '0.15em' }}
                   >
-                    Logout
+                    {/* Avatar circle */}
+                    <span
+                      className="flex items-center justify-center w-7 h-7 rounded-full text-xs font-semibold shrink-0"
+                      style={{
+                        background: 'var(--gold)',
+                        color: 'var(--bg)',
+                        fontFamily: 'Josefin Sans, sans-serif',
+                        letterSpacing: '0.05em',
+                      }}
+                    >
+                      {user.name?.charAt(0).toUpperCase()}
+                    </span>
+                    <span style={{ color: 'var(--text)', letterSpacing: '0.12em' }}>{user.name}</span>
+                    {/* Chevron */}
+                    <svg
+                      width="10" height="10" viewBox="0 0 10 10" fill="none"
+                      style={{
+                        color: 'var(--muted)',
+                        transition: 'transform 0.2s ease',
+                        transform: profileOpen ? 'rotate(180deg)' : 'rotate(0deg)',
+                      }}
+                    >
+                      <path d="M2 3.5L5 6.5L8 3.5" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" />
+                    </svg>
                   </button>
+
+                  {/* Dropdown Panel */}
+                  <div
+                    className="absolute right-0 mt-3 w-52"
+                    style={{
+                      background: 'var(--surface)',
+                      border: '1px solid var(--border)',
+                      boxShadow: '0 8px 32px rgba(0,0,0,0.10)',
+                      opacity: profileOpen ? 1 : 0,
+                      pointerEvents: profileOpen ? 'auto' : 'none',
+                      transform: profileOpen ? 'translateY(0)' : 'translateY(-6px)',
+                      transition: 'opacity 0.18s ease, transform 0.18s ease',
+                      zIndex: 100,
+                    }}
+                  >
+                    {/* User info header */}
+                    <div
+                      className="px-4 py-3"
+                      style={{ borderBottom: '1px solid var(--border)' }}
+                    >
+                      <p style={{ color: 'var(--muted)', fontSize: '0.6rem', letterSpacing: '0.18em', fontFamily: 'Josefin Sans, sans-serif' }} className="uppercase mb-0.5">
+                        Signed in as
+                      </p>
+                      <p style={{ color: 'var(--text)', fontSize: '0.85rem', fontFamily: 'Cormorant Garamond, serif' }}>
+                        {user.name}
+                      </p>
+                      <p style={{ color: 'var(--muted)', fontSize: '0.68rem' }}>{user.email}</p>
+                    </div>
+
+                    {/* Dropdown links */}
+                    <div className="py-1">
+                      <DropdownItem href="/orders" onClick={() => setProfileOpen(false)}>
+                        My Orders
+                      </DropdownItem>
+                      <DropdownItem href="/account" onClick={() => setProfileOpen(false)}>
+                        Account Settings
+                      </DropdownItem>
+                    </div>
+
+                    {/* Logout */}
+                    <div style={{ borderTop: '1px solid var(--border)' }} className="py-1">
+                      <button
+                        onClick={handleLogout}
+                        className="w-full text-left px-4 py-2.5 uppercase tracking-widest transition-opacity hover:opacity-60 flex items-center gap-2"
+                        style={{ color: 'var(--danger)', fontSize: '0.65rem', letterSpacing: '0.18em', fontFamily: 'Josefin Sans, sans-serif' }}
+                      >
+                        <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+                          <path d="M4.5 6H10.5M10.5 6L8.5 4M10.5 6L8.5 8M7 2H2.5C2.22 2 2 2.22 2 2.5V9.5C2 9.78 2.22 10 2.5 10H7" stroke="currentColor" strokeWidth="1.1" strokeLinecap="round" strokeLinejoin="round" />
+                        </svg>
+                        Logout
+                      </button>
+                    </div>
+                  </div>
                 </div>
               </>
             ) : (
@@ -134,7 +225,6 @@ export default function Navbar() {
                 🛒
               </Link>
             )}
-            {/* Hamburger */}
             <button
               onClick={() => setMenuOpen(!menuOpen)}
               className="flex flex-col justify-center items-center w-8 h-8 gap-1.5 transition-opacity hover:opacity-60"
@@ -208,6 +298,20 @@ export default function Navbar() {
         </div>
       </div>
     </>
+  );
+}
+
+// Dropdown menu item
+function DropdownItem({ href, onClick, children }: { href: string; onClick: () => void; children: React.ReactNode }) {
+  return (
+    <Link
+      href={href}
+      onClick={onClick}
+      className="block px-4 py-2.5 uppercase tracking-widest transition-opacity hover:opacity-60"
+      style={{ color: 'var(--text-secondary)', fontSize: '0.65rem', letterSpacing: '0.18em', fontFamily: 'Josefin Sans, sans-serif' }}
+    >
+      {children}
+    </Link>
   );
 }
 
