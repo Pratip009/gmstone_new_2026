@@ -7,31 +7,34 @@ import SortBar from "@/components/products/SortBar";
 import Pagination from "@/components/ui/Pagination";
 import MobileFilterDrawer from "@/components/filters/MobileFilterDrawer";
 import { Suspense } from "react";
+
 interface PageProps {
-  searchParams: Record<string, string>;
+  searchParams: Promise<Record<string, string>>; // ✅ fixed
 }
 
 export default async function WatchesPage({ searchParams }: PageProps) {
   await connectDB();
 
+  const sp = await searchParams; // ✅ unwrap first
+
   const params: ProductFilterParams = {
-    category: searchParams.category ?? "watches", // always scope to watches
-    subcategory: searchParams.subcategory,
-    watchGender: searchParams.watchGender,
-    watchBrand: searchParams.watchBrand,
-    watchMovement: searchParams.watchMovement,
-    watchStrapType: searchParams.watchStrapType,
-    watchCaseMaterial: searchParams.watchCaseMaterial,
-    watchDialColor: searchParams.watchDialColor,
-    watchFeatures: searchParams.watchFeatures,
-    watchStyle: searchParams.watchStyle,
-    watchCaseSize: searchParams.watchCaseSize,
-    priceMin: searchParams.priceMin,
-    priceMax: searchParams.priceMax,
-    inStock: searchParams.inStock,
-    q: searchParams.q,
-    sortBy: searchParams.sortBy as ProductFilterParams["sortBy"],
-    page: searchParams.page || 1,
+    category: sp.category ?? "watches",
+    subcategory: sp.subcategory,
+    watchGender: sp.watchGender,
+    watchBrand: sp.watchBrand,
+    watchMovement: sp.watchMovement,
+    watchStrapType: sp.watchStrapType,
+    watchCaseMaterial: sp.watchCaseMaterial,
+    watchDialColor: sp.watchDialColor,
+    watchFeatures: sp.watchFeatures,
+    watchStyle: sp.watchStyle,
+    watchCaseSize: sp.watchCaseSize,
+    priceMin: sp.priceMin,
+    priceMax: sp.priceMax,
+    inStock: sp.inStock,
+    q: sp.q,
+    sortBy: sp.sortBy as ProductFilterParams["sortBy"],
+    page: sp.page || 1,
     limit: 24,
   };
 
@@ -63,8 +66,8 @@ export default async function WatchesPage({ searchParams }: PageProps) {
 
             <SortBar
               total={total}
-              currentSort={searchParams.sortBy}
-              query={searchParams.q}
+              currentSort={sp.sortBy} // ✅ fixed
+              query={sp.q}            // ✅ fixed
             />
 
             {products.length === 0 ? (
@@ -111,9 +114,7 @@ export default async function WatchesPage({ searchParams }: PageProps) {
                       watchMovement: p.watchMovement as string | undefined,
                       watchGender: p.watchGender as string | undefined,
                       watchStyle: p.watchStyle as string | undefined,
-                      watchCaseMaterial: p.watchCaseMaterial as
-                        | string
-                        | undefined,
+                      watchCaseMaterial: p.watchCaseMaterial as string | undefined,
                       watchDialColor: p.watchDialColor as string | undefined,
                       watchStrapType: p.watchStrapType as string | undefined,
                       watchCaseSize: p.watchCaseSize as string | undefined,
@@ -133,7 +134,7 @@ export default async function WatchesPage({ searchParams }: PageProps) {
                   <Pagination
                     page={page}
                     totalPages={totalPages}
-                    searchParams={searchParams}
+                    searchParams={sp} // ✅ fixed
                   />
                 </div>
               </>

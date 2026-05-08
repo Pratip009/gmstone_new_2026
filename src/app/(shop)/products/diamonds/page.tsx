@@ -7,28 +7,31 @@ import SortBar from "@/components/products/SortBar";
 import Pagination from "@/components/ui/Pagination";
 import MobileFilterDrawer from "@/components/filters/MobileFilterDrawer";
 import { Suspense } from "react";
+
 interface PageProps {
-  searchParams: Record<string, string>;
+  searchParams: Promise<Record<string, string>>; // ✅ fixed
 }
 
 export default async function DiamondsPage({ searchParams }: PageProps) {
   await connectDB();
 
+  const sp = await searchParams; // ✅ unwrap first
+
   const params: ProductFilterParams = {
-    category: searchParams.category ?? "diamonds", // always scope to diamonds
-    subcategory: searchParams.subcategory,
-    shape: searchParams.shape,
-    color: searchParams.color,
-    clarity: searchParams.clarity,
-    certification: searchParams.certification,
-    priceMin: searchParams.priceMin,
-    priceMax: searchParams.priceMax,
-    sizeMin: searchParams.sizeMin,
-    sizeMax: searchParams.sizeMax,
-    inStock: searchParams.inStock,
-    q: searchParams.q,
-    sortBy: searchParams.sortBy as ProductFilterParams["sortBy"],
-    page: searchParams.page || 1,
+    category: sp.category ?? "diamonds",
+    subcategory: sp.subcategory,
+    shape: sp.shape,
+    color: sp.color,
+    clarity: sp.clarity,
+    certification: sp.certification,
+    priceMin: sp.priceMin,
+    priceMax: sp.priceMax,
+    sizeMin: sp.sizeMin,
+    sizeMax: sp.sizeMax,
+    inStock: sp.inStock,
+    q: sp.q,
+    sortBy: sp.sortBy as ProductFilterParams["sortBy"],
+    page: sp.page || 1,
     limit: 24,
   };
 
@@ -46,7 +49,7 @@ export default async function DiamondsPage({ searchParams }: PageProps) {
           <aside className="hidden lg:block w-56 xl:w-60 shrink-0">
             <div className="sticky top-6">
               <Suspense fallback={<div>Loading filters...</div>}>
-                <FilterSidebar productType="watch" facets={facets} />
+                <FilterSidebar productType="diamond" facets={facets} /> {/* ✅ fixed */}
               </Suspense>
             </div>
           </aside>
@@ -60,8 +63,8 @@ export default async function DiamondsPage({ searchParams }: PageProps) {
 
             <SortBar
               total={total}
-              currentSort={searchParams.sortBy}
-              query={searchParams.q}
+              currentSort={sp.sortBy} // ✅ fixed
+              query={sp.q}            // ✅ fixed
             />
 
             {products.length === 0 ? (
@@ -108,10 +111,7 @@ export default async function DiamondsPage({ searchParams }: PageProps) {
                       size: p.size as number | undefined,
                       color: p.color as string | string[] | undefined,
                       clarity: p.clarity as string | string[] | undefined,
-                      certification: p.certification as
-                        | string
-                        | string[]
-                        | undefined,
+                      certification: p.certification as string | string[] | undefined,
                       images: p.images as string[],
                       stock: p.stock as number,
                     };
@@ -128,7 +128,7 @@ export default async function DiamondsPage({ searchParams }: PageProps) {
                   <Pagination
                     page={page}
                     totalPages={totalPages}
-                    searchParams={searchParams}
+                    searchParams={sp} // ✅ fixed
                   />
                 </div>
               </>

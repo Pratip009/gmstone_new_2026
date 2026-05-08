@@ -464,9 +464,9 @@ export default function SpecialsMarquee() {
               fontFamily: "'Jost', sans-serif",
               fontSize: 10, fontWeight: 500,
               letterSpacing: "0.25em", textTransform: "uppercase",
-              color: "#9ca3af",
+              color: "#ff0000",
             }}>
-              {loading ? "Loading products…" : `${allProducts.length} products available`}
+              {loading ? "Loading products…" : `50% off!`}
             </div>
           </div>
 

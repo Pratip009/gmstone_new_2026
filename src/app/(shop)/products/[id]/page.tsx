@@ -11,13 +11,11 @@ type ProductDoc = {
   _id: unknown;
   name: string;
   price: number;
-  // Diamond
   shape?: string | string[];
   size?: number;
   color?: string | string[];
   clarity?: string | string[];
   certification?: string | string[];
-  // Watch
   watchBrand?: string;
   watchMovement?: string;
   watchGender?: string;
@@ -27,7 +25,6 @@ type ProductDoc = {
   watchDialColor?: string;
   watchCaseSize?: string;
   watchFeatures?: string[];
-  // Common
   images: string[];
   stock: number;
   description?: string;
@@ -40,12 +37,10 @@ type RelatedItem = {
   name: string;
   price: number;
   img: string;
-  // diamond
   shape?: string;
   size?: number;
   color?: string;
   clarity?: string;
-  // watch
   watchBrand?: string;
   watchMovement?: string;
   watchGender?: string;
@@ -74,13 +69,32 @@ function isWatchDoc(p: ProductDoc): boolean {
   return !!(p.watchBrand || p.watchMovement || p.watchGender);
 }
 
+// ─── SVG Icons ────────────────────────────────────────────────────────────────
+function WatchIcon() {
+  return (
+    <svg width="11" height="11" viewBox="0 0 18 18" fill="none" aria-hidden="true">
+      <circle cx="9" cy="9" r="6.5" stroke="currentColor" strokeWidth="1.25" />
+      <path d="M9 5.5V9l2 2" stroke="currentColor" strokeWidth="1.25" strokeLinecap="round" strokeLinejoin="round" />
+      <rect x="7" y="1" width="4" height="2.5" rx="0.5" stroke="currentColor" strokeWidth="1" />
+      <rect x="7" y="14.5" width="4" height="2.5" rx="0.5" stroke="currentColor" strokeWidth="1" />
+    </svg>
+  );
+}
+function DiamondIcon() {
+  return (
+    <svg width="11" height="11" viewBox="0 0 18 18" fill="none" aria-hidden="true">
+      <path d="M9 16L2 7l2.5-5h9L16 7z" stroke="currentColor" strokeWidth="1.25" strokeLinejoin="round" />
+      <path d="M2 7h14M9 16L5 7l4-5 4 5z" stroke="currentColor" strokeWidth="1" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
 // ─── Related products ─────────────────────────────────────────────────────────
 async function getRelatedProducts(p: ProductDoc, excludeId: string, limit = 4): Promise<RelatedItem[]> {
   const watch = isWatchDoc(p);
   let docs: any[] = [];
 
   if (watch) {
-    // Related watches: same brand first, then other watches
     docs = await Product.find({
       watchBrand: p.watchBrand,
       _id: { $ne: excludeId },
@@ -99,7 +113,6 @@ async function getRelatedProducts(p: ProductDoc, excludeId: string, limit = 4): 
       docs = [...docs, ...fallback];
     }
   } else {
-    // Related diamonds: same shape first
     docs = await Product.find({
       shape: { $regex: new RegExp(first(p.shape), 'i') },
       _id: { $ne: excludeId },
@@ -166,9 +179,16 @@ const TESTIMONIALS = [
 ];
 
 // ─── Page ─────────────────────────────────────────────────────────────────────
-export default async function ProductDetailPage({ params }: { params: { id: string } }) {
+export default async function ProductDetailPage({
+  params,
+}: {
+  params: Promise<{ id: string }>; // ✅ Promise in Next.js 15+
+}) {
   await connectDB();
-  const raw = await getProductById(params.id);
+
+  const { id } = await params; // ✅ unwrap first
+
+  const raw = await getProductById(id);
   if (!raw) notFound();
 
   const rawObj = raw as unknown as ProductDoc;
@@ -177,7 +197,6 @@ export default async function ProductDetailPage({ params }: { params: { id: stri
 
   const related = await getRelatedProducts(p, String(p._id), 4);
 
-  // Build specs based on type
   const specs = watch
     ? [
         { label: 'Brand',         value: p.watchBrand ?? '—' },
@@ -189,11 +208,7 @@ export default async function ProductDetailPage({ params }: { params: { id: stri
         { label: 'Dial Color',    value: p.watchDialColor ?? '—' },
         { label: 'Case Size',     value: p.watchCaseSize ?? '—' },
         { label: 'Features',      value: p.watchFeatures?.join(', ') || '—' },
-        {
-          label: 'Availability',
-          value: p.stock > 0 ? `${p.stock} in stock` : 'Out of stock',
-          highlight: p.stock > 0,
-        },
+        { label: 'Availability',  value: p.stock > 0 ? `${p.stock} in stock` : 'Out of stock', highlight: p.stock > 0 },
       ]
     : [
         { label: 'Shape',         value: capitalize(p.shape) },
@@ -201,20 +216,15 @@ export default async function ProductDetailPage({ params }: { params: { id: stri
         { label: 'Color Grade',   value: display(p.color) },
         { label: 'Clarity',       value: display(p.clarity) },
         { label: 'Certification', value: certDisplay(p.certification) },
-        {
-          label: 'Availability',
-          value: p.stock > 0 ? `${p.stock} in stock` : 'Out of stock',
-          highlight: p.stock > 0,
-        },
+        { label: 'Availability',  value: p.stock > 0 ? `${p.stock} in stock` : 'Out of stock', highlight: p.stock > 0 },
       ];
 
   const certBadge = certDisplay(p.certification);
   const showCertBadge = !watch && certBadge !== '—';
 
-  // Subtitle for hero
   const heroSubtitle = watch
-    ? `${p.watchGender ?? ''} · ${p.watchStyle ?? ''} · ${p.watchMovement ?? ''}`
-    : `${display(p.color)} Color · ${display(p.clarity)} Clarity · ${p.size ?? ''} ct`;
+    ? [p.watchGender, p.watchStyle, p.watchMovement].filter(Boolean).join(' · ')
+    : [display(p.color) ? `${display(p.color)} Color` : '', display(p.clarity) ? `${display(p.clarity)} Clarity` : '', p.size ? `${p.size} ct` : ''].filter(Boolean).join(' · ');
 
   return (
     <>
@@ -299,9 +309,9 @@ export default async function ProductDetailPage({ params }: { params: { id: stri
         .pd-related-meta { font-size: 10px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--muted); margin-bottom: 6px; }
         .pd-related-price { font-family: 'Playfair Display', serif; font-size: 16px; color: var(--ink); }
         .pd-related-empty { grid-column: 1/-1; text-align: center; padding: 48px; color: var(--muted); font-size: 13px; letter-spacing: 0.06em; border: 1px dashed var(--border); }
-        .pd-related-type-pip { display: inline-block; font-size: 7px; font-weight: 700; letter-spacing: 0.14em; text-transform: uppercase; padding: 2px 6px; border-radius: 2px; margin-bottom: 6px; }
-        .pd-related-type-pip.watch { background: #eff6ff; color: #1d4ed8; }
-        .pd-related-type-pip.diamond { background: #fdf4ff; color: #7e22ce; }
+        .pd-related-type-pip { display: inline-flex; align-items: center; gap: 4px; font-size: 7px; font-weight: 700; letter-spacing: 0.14em; text-transform: uppercase; padding: 2px 6px; border-radius: 2px; margin-bottom: 6px; }
+        .pd-related-type-pip.watch { background: #eff6ff; color: #1d4ed8; border: 0.5px solid rgba(29,78,216,0.2); }
+        .pd-related-type-pip.diamond { background: #fdf4ff; color: #7e22ce; border: 0.5px solid rgba(126,34,206,0.2); }
         .pd-testimonials { background: var(--bg-off); padding: 64px 40px; margin: 0 -40px 64px; }
         @media (max-width: 600px) { .pd-testimonials { margin: 0 -16px 64px; padding: 48px 16px; } }
         .pd-testimonial-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 32px; margin-top: 40px; }
@@ -354,9 +364,10 @@ export default async function ProductDetailPage({ params }: { params: { id: stri
             />
 
             <div>
-              {/* Type pill */}
+              {/* Type pill — SVG icons, no emoji */}
               <div className={`pd-type-label ${watch ? 'watch' : 'diamond'}`}>
-                {watch ? '⌚ Luxury Watch' : '💎 Fine Diamond'}
+                {watch ? <WatchIcon /> : <DiamondIcon />}
+                {watch ? 'Luxury Watch' : 'Fine Diamond'}
               </div>
 
               <p className="pd-category-label">
@@ -457,8 +468,10 @@ export default async function ProductDetailPage({ params }: { params: { id: stri
                       }
                       <div className="pd-related-img-overlay" />
                     </div>
+                    {/* SVG icons instead of emoji */}
                     <div className={`pd-related-type-pip ${relIsWatch ? 'watch' : 'diamond'}`}>
-                      {relIsWatch ? '⌚ Watch' : '💎 Diamond'}
+                      {relIsWatch ? <WatchIcon /> : <DiamondIcon />}
+                      {relIsWatch ? 'Watch' : 'Diamond'}
                     </div>
                     <div className="pd-related-meta">{relMeta}</div>
                     <div className="pd-related-name">{item.name}</div>
@@ -473,7 +486,10 @@ export default async function ProductDetailPage({ params }: { params: { id: stri
           <div className="pd-testimonials">
             <div className="pd-section-head">
               <h2 className="pd-section-title">What Our Clients Say</h2>
-              <Link href="#" className="pd-section-link">All reviews <svg width="14" height="14" fill="none" viewBox="0 0 24 24"><path d="M5 12h14M12 5l7 7-7 7" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round"/></svg></Link>
+              <Link href="#" className="pd-section-link">
+                All reviews
+                <svg width="14" height="14" fill="none" viewBox="0 0 24 24"><path d="M5 12h14M12 5l7 7-7 7" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round"/></svg>
+              </Link>
             </div>
             <div className="pd-testimonial-grid">
               {TESTIMONIALS.map((t) => (
