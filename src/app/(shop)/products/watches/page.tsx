@@ -11,21 +11,12 @@ interface PageProps {
   searchParams: Record<string, string>;
 }
 
-export default async function ProductsPage({ searchParams }: PageProps) {
+export default async function WatchesPage({ searchParams }: PageProps) {
   await connectDB();
 
   const params: ProductFilterParams = {
-    category:      searchParams.category,
-    subcategory:   searchParams.subcategory,
-    shape:         searchParams.shape,
-    color:         searchParams.color,
-    clarity:       searchParams.clarity,
-    certification: searchParams.certification,
-    priceMin:      searchParams.priceMin,
-    priceMax:      searchParams.priceMax,
-    sizeMin:       searchParams.sizeMin,
-    sizeMax:       searchParams.sizeMax,
-    // Watch params — needed so watch-specific filter URLs work
+    category:          searchParams.category ?? 'watches',  // always scope to watches
+    subcategory:       searchParams.subcategory,
     watchGender:       searchParams.watchGender,
     watchBrand:        searchParams.watchBrand,
     watchMovement:     searchParams.watchMovement,
@@ -35,11 +26,13 @@ export default async function ProductsPage({ searchParams }: PageProps) {
     watchFeatures:     searchParams.watchFeatures,
     watchStyle:        searchParams.watchStyle,
     watchCaseSize:     searchParams.watchCaseSize,
-    inStock:       searchParams.inStock,
-    q:             searchParams.q,
-    sortBy:        searchParams.sortBy as ProductFilterParams['sortBy'],
-    page:          searchParams.page || 1,
-    limit:         24,
+    priceMin:          searchParams.priceMin,
+    priceMax:          searchParams.priceMax,
+    inStock:           searchParams.inStock,
+    q:                 searchParams.q,
+    sortBy:            searchParams.sortBy as ProductFilterParams['sortBy'],
+    page:              searchParams.page || 1,
+    limit:             24,
   };
 
   const [{ products, total, page, limit }, facets] = await Promise.all([
@@ -49,25 +42,17 @@ export default async function ProductsPage({ searchParams }: PageProps) {
 
   const totalPages = Math.ceil(total / limit);
 
-  // Detect productType from URL so FilterSidebar and cards stay in sync
-const categorySlug = searchParams.category ?? '';
-const productType: 'watch' | 'diamond' =
-  (products[0] as any)?.category?.slug === 'watches'
-    ? 'watch'
-    : 'diamond';
   return (
     <div className="min-h-screen bg-[#f7f6f3]">
       <div className="max-w-screen-2xl mx-auto px-4 sm:px-6 py-6 sm:py-10">
         <div className="flex gap-8 xl:gap-10">
 
-          {/* ── Sidebar: hidden on mobile, visible lg+ ── */}
           <aside className="hidden lg:block w-56 xl:w-60 shrink-0">
             <div className="sticky top-6">
-              <FilterSidebar productType={productType} facets={facets} />
+              <FilterSidebar productType="watch" facets={facets} />
             </div>
           </aside>
 
-          {/* ── Main content ── */}
           <main className="flex-1 min-w-0">
 
             <div className="flex items-center gap-2 mb-3 lg:hidden">
@@ -92,38 +77,29 @@ const productType: 'watch' | 'diamond' =
                 <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-2.5 sm:gap-3 mt-3">
                   {products.map((p: Record<string, unknown>) => {
                     const serialized = {
-                      _id:           String(p._id),
-                      name:          p.name as string,
-                      price:         p.price as number,
-                      // Diamond fields
-                      shape:         p.shape         as string | string[] | undefined,
-                      size:          p.size          as number | undefined,
-                      color:         p.color         as string | string[] | undefined,
-                      clarity:       p.clarity       as string | string[] | undefined,
-                      certification: p.certification as string | string[] | undefined,
-                      // Watch fields — these were missing before, causing isWatch() to always return false
+                      _id:               String(p._id),
+                      name:              p.name              as string,
+                      price:             p.price             as number,
                       watchBrand:        p.watchBrand        as string | undefined,
                       watchMovement:     p.watchMovement     as string | undefined,
                       watchGender:       p.watchGender       as string | undefined,
                       watchStyle:        p.watchStyle        as string | undefined,
                       watchCaseMaterial: p.watchCaseMaterial as string | undefined,
-                      watchDialColor:    p.watchDialColor     as string | undefined,
+                      watchDialColor:    p.watchDialColor    as string | undefined,
                       watchStrapType:    p.watchStrapType    as string | undefined,
                       watchCaseSize:     p.watchCaseSize     as string | undefined,
-                      // Common
-                      images: p.images as string[],
-                      stock:  p.stock  as number,
+                      images:            p.images            as string[],
+                      stock:             p.stock             as number,
                     };
                     return (
                       <ProductCard
                         key={serialized._id}
                         product={serialized}
-                        productType={productType}
+                        productType="watch"
                       />
                     );
                   })}
                 </div>
-
                 <div className="mt-10 sm:mt-12">
                   <Pagination page={page} totalPages={totalPages} searchParams={searchParams} />
                 </div>

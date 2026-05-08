@@ -1,414 +1,237 @@
-/* eslint-disable react-hooks/set-state-in-effect */
 "use client";
-import { useState, useEffect, useRef, useCallback } from "react";
+import Image from "next/image";
 import Link from "next/link";
+import { useEffect, useRef } from "react";
 
-// ─── Direct .mp4 stream URLs (not /download/ links) ───────────────────────────
-const SLIDES = [
+const BUTTONS = [
   {
-    id: 0,
-    video: "https://www.pexels.com/download/video/5106444/",
-    poster: "https://images.pexels.com/videos/4763824/pictures/preview-0.jpg",
-    eyebrow: "The Crown Collection",
-    headline: ["Diamonds", "Born from", "Eternity"],
-    sub: "GIA-certified round brilliants, hand-selected for exceptional fire and clarity.",
-    cta: { label: "Explore Diamonds", href: "/diamonds" },
-    accent: "Diamonds",
+    label: "Shop Diamonds",
+    href: "/products?category=diamonds",
+    icon: (
+      <svg width="14" height="14" viewBox="0 0 20 20" fill="none">
+        <polygon points="10,2 18,8 15,18 5,18 2,8" stroke="currentColor" strokeWidth="1.3" strokeLinejoin="round"/>
+        <line x1="2" y1="8" x2="18" y2="8" stroke="currentColor" strokeWidth="0.9"/>
+        <line x1="6" y1="8" x2="10" y2="2" stroke="currentColor" strokeWidth="0.8"/>
+        <line x1="14" y1="8" x2="10" y2="2" stroke="currentColor" strokeWidth="0.8"/>
+      </svg>
+    ),
   },
   {
-    id: 1,
-    video: "https://www.pexels.com/download/video/10737829/",
-    poster: "https://images.pexels.com/videos/6207378/pictures/preview-0.jpg",
-    eyebrow: "Signature Necklaces",
-    headline: ["Worn by", "Those Who", "Dare"],
-    sub: "Bespoke necklaces crafted in 18k gold, set with the world's rarest stones.",
-    cta: { label: "View Collection", href: "/collections" },
-    accent: "Necklaces",
+    label: "Shop Gemstones",
+    href: "/products?category=semi-precious",
+    icon: (
+      <svg width="14" height="14" viewBox="0 0 20 20" fill="none">
+        <ellipse cx="10" cy="10" rx="7.5" ry="5.5" stroke="currentColor" strokeWidth="1.3"/>
+        <ellipse cx="10" cy="10" rx="4" ry="2.5" stroke="currentColor" strokeWidth="0.8"/>
+        <line x1="2.5" y1="10" x2="17.5" y2="10" stroke="currentColor" strokeWidth="0.7"/>
+        <line x1="10" y1="4.5" x2="10" y2="15.5" stroke="currentColor" strokeWidth="0.7"/>
+      </svg>
+    ),
   },
   {
-    id: 2,
-    video: "https://www.pexels.com/download/video/35361259/",
-    poster: "https://images.pexels.com/videos/5874374/pictures/preview-0.jpg",
-    eyebrow: "Rare Gemstones",
-    headline: ["Colour", "Beyond", "Imagination"],
-    sub: "Alexandrites, Padparadscha Sapphires, and unheated Burmese Rubies—sourced at origin.",
-    cta: { label: "Discover Gems", href: "/gemstones" },
-    accent: "Gemstones",
+    label: "Shop Jewelry",
+    href: "/products?category=jewelry",
+    icon: (
+      <svg width="14" height="14" viewBox="0 0 20 20" fill="none">
+        <circle cx="10" cy="10" r="7" stroke="currentColor" strokeWidth="1.3"/>
+        <circle cx="10" cy="10" r="3" stroke="currentColor" strokeWidth="0.8"/>
+        <circle cx="10" cy="3" r="1.2" fill="currentColor"/>
+        <circle cx="10" cy="17" r="1.2" fill="currentColor"/>
+        <circle cx="3" cy="10" r="1.2" fill="currentColor"/>
+        <circle cx="17" cy="10" r="1.2" fill="currentColor"/>
+      </svg>
+    ),
   },
 ] as const;
 
-const AUTOPLAY_MS = 7000;
-const TRANSITION_MS = 900;
+export default function HeroBanner() {
+  const imgRef = useRef<HTMLDivElement>(null);
 
-export default function HeroCarousel() {
-  const [current, setCurrent]   = useState(0);
-  const [prev,    setPrev]      = useState<number | null>(null);
-  const [busy,    setBusy]      = useState(false);
-  const [progress, setProgress] = useState(0);
-  const [paused,  setPaused]    = useState(false);
-
-  // Refs — never trigger re-renders
-  const videoRefs    = useRef<(HTMLVideoElement | null)[]>([]);
-  const rafRef       = useRef<number | null>(null);
-  const startRef     = useRef<number>(0);
-  const pausedRef    = useRef(false);   // shadow of `paused` for rAF closure
-  const busyRef      = useRef(false);   // shadow of `busy`
-  const currentRef   = useRef(0);       // shadow of `current`
-  const touchStartX  = useRef<number | null>(null);
-
-  // Keep shadow refs in sync
-  useEffect(() => { pausedRef.current  = paused;  }, [paused]);
-  useEffect(() => { busyRef.current    = busy;    }, [busy]);
-  useEffect(() => { currentRef.current = current; }, [current]);
-
-  // ─── goTo ──────────────────────────────────────────────────────────────────
-  const goTo = useCallback((idx: number) => {
-    if (busyRef.current || idx === currentRef.current) return;
-    const from = currentRef.current;
-
-    busyRef.current = true;
-    setBusy(true);
-    setPrev(from);
-    setCurrent(idx);
-    setProgress(0);
-    startRef.current = performance.now();
-
-    // Swap video: pause old, play new
-    const oldVid = videoRefs.current[from];
-    const newVid = videoRefs.current[idx];
-    if (oldVid) oldVid.pause();
-    if (newVid) {
-      newVid.currentTime = 0;
-      newVid.play().catch(() => {});
-    }
-
-    setTimeout(() => {
-      setPrev(null);
-      setBusy(false);
-      busyRef.current = false;
-    }, TRANSITION_MS);
-  }, []);
-
-  const next = useCallback(() => goTo((currentRef.current + 1) % SLIDES.length), [goTo]);
-  const prev_ = useCallback(() => goTo((currentRef.current - 1 + SLIDES.length) % SLIDES.length), [goTo]);
-
-  // ─── rAF progress loop — single loop, no setInterval drift ────────────────
   useEffect(() => {
-    startRef.current = performance.now();
-
-    const tick = (now: number) => {
-      if (!pausedRef.current) {
-        const elapsed = now - startRef.current;
-        const pct = Math.min((elapsed / AUTOPLAY_MS) * 100, 100);
-        setProgress(pct);
-        if (pct >= 100) {
-          next();
-          startRef.current = performance.now(); // reset immediately in loop
-        }
-      }
-      rafRef.current = requestAnimationFrame(tick);
+    const el = imgRef.current;
+    if (!el) return;
+    const onScroll = () => {
+      el.style.transform = `translateY(${window.scrollY * 0.15}px)`;
     };
-
-    rafRef.current = requestAnimationFrame(tick);
-    return () => { if (rafRef.current) cancelAnimationFrame(rafRef.current); };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []); // mount-once — next() is stable via useCallback with no deps that change
-
-  // Reset progress timer when slide changes
-  useEffect(() => {
-    startRef.current = performance.now();
-    setProgress(0);
-  }, [current]);
-
-  // ─── Autoplay first video on mount ────────────────────────────────────────
-  useEffect(() => {
-    const v = videoRefs.current[0];
-    if (v) v.play().catch(() => {});
+    window.addEventListener("scroll", onScroll, { passive: true });
+    return () => window.removeEventListener("scroll", onScroll);
   }, []);
-
-  // ─── Touch / swipe support ────────────────────────────────────────────────
-  const onTouchStart = (e: React.TouchEvent) => {
-    touchStartX.current = e.touches[0].clientX;
-  };
-  const onTouchEnd = (e: React.TouchEvent) => {
-    if (touchStartX.current === null) return;
-    const dx = e.changedTouches[0].clientX - touchStartX.current;
-    if (Math.abs(dx) > 50) dx < 0 ? next() : prev_();
-    touchStartX.current = null;
-  };
 
   return (
-    <section
-      className="relative w-full overflow-hidden bg-[#080706]"
-      style={{ height: "100svh", minHeight: 560 }}
-      onMouseEnter={() => setPaused(true)}
-      onMouseLeave={() => setPaused(false)}
-      onTouchStart={onTouchStart}
-      onTouchEnd={onTouchEnd}
-    >
+    <section style={{
+      position: "relative",
+      width: "100%",
+      overflow: "hidden",
+      background: "#060402",
+      height: "70vh",
+      minHeight: 440,
+      maxHeight: 680,
+    }}>
+      <style>{`
+        @import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;1,300;1,400&family=Jost:wght@300;400;500;600&display=swap');
 
-      {/* ── VIDEO LAYERS ──────────────────────────────────────────────────── */}
-      {SLIDES.map((slide, i) => (
-        <div
-          key={slide.id}
-          aria-hidden={i !== current}
-          className="absolute inset-0"
-          style={{
-            zIndex: i === current ? 2 : i === prev ? 1 : 0,
-            opacity: i === current ? 1 : (i === prev ? 1 : 0),
-            transition: i === current
-              ? `opacity ${TRANSITION_MS}ms cubic-bezier(0.4,0,0.2,1)`
-              : "none",
-          }}
-        >
-          <video
-            ref={(el) => { videoRefs.current[i] = el; }}
-            src={slide.video}
-            poster={slide.poster}
-            muted
-            loop
-            playsInline
-            // Only decode/load the first video eagerly; others are lazy
-            preload={i === 0 ? "auto" : "none"}
-            className="absolute inset-0 w-full h-full object-cover"
-            style={{ filter: "brightness(0.42) saturate(0.8)" }}
-          />
-        </div>
-      ))}
+        .hb-serif { font-family: 'Cormorant Garamond', serif; }
+        .hb-sans  { font-family: 'Jost', sans-serif; }
 
-      {/* ── CINEMATIC VIGNETTES ───────────────────────────────────────────── */}
-      <div className="pointer-events-none absolute inset-0 z-10"
-        style={{ background: "linear-gradient(180deg,rgba(8,7,6,.65) 0%,transparent 22%)" }} />
-      <div className="pointer-events-none absolute inset-0 z-10"
-        style={{ background: "linear-gradient(0deg,rgba(8,7,6,.97) 0%,rgba(8,7,6,.45) 38%,transparent 65%)" }} />
-      <div className="pointer-events-none absolute inset-y-0 left-0 w-24 md:w-40 z-10"
-        style={{ background: "linear-gradient(90deg,rgba(8,7,6,.55) 0%,transparent)" }} />
-      <div className="pointer-events-none absolute inset-y-0 right-0 w-24 md:w-40 z-10"
-        style={{ background: "linear-gradient(-90deg,rgba(8,7,6,.55) 0%,transparent)" }} />
+        @keyframes hbUp   { from{opacity:0;transform:translateY(24px)} to{opacity:1;transform:translateY(0)} }
+        @keyframes hbLineH{ from{transform:scaleX(0)} to{transform:scaleX(1)} }
+        @keyframes hbLineV{ from{transform:scaleY(0)} to{transform:scaleY(1)} }
 
-      {/* ── GRAIN ─────────────────────────────────────────────────────────── */}
-      <div
-        aria-hidden
-        className="pointer-events-none absolute inset-0 z-10 opacity-[0.028]"
-        style={{
-          backgroundImage: `url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E")`,
-          backgroundSize: "180px 180px",
-        }}
-      />
+        .hb-a1{opacity:0;animation:hbUp 1s 0.10s cubic-bezier(0.22,1,0.36,1) forwards}
+        .hb-a2{opacity:0;animation:hbUp 1s 0.26s cubic-bezier(0.22,1,0.36,1) forwards}
+        .hb-a3{opacity:0;animation:hbUp 1s 0.42s cubic-bezier(0.22,1,0.36,1) forwards}
+        .hb-a4{opacity:0;animation:hbUp 1s 0.56s cubic-bezier(0.22,1,0.36,1) forwards}
 
-      {/* ── CORNER BRACKETS (desktop only) ───────────────────────────────── */}
-      {[
-        { pos: "top-6 left-6",    d: "M40 2H2V40" },
-        { pos: "top-6 right-6",   d: "M0 2H38V40" },
-        { pos: "bottom-6 left-6", d: "M40 38H2V0"  },
-        { pos: "bottom-6 right-6",d: "M0 38H38V0"  },
-      ].map(({ pos, d }) => (
-        <div key={d} className={`absolute ${pos} z-20 pointer-events-none hidden lg:block`}>
-          <svg width="36" height="36" viewBox="0 0 40 40" fill="none">
-            <path d={d} stroke="#b8912a" strokeWidth="1.5" strokeOpacity="0.55" />
-          </svg>
-        </div>
-      ))}
+        .hbc{position:absolute;width:40px;height:40px;pointer-events:none;z-index:40}
+        .hbc::before,.hbc::after{content:'';position:absolute;background:rgba(255,255,255,0.30)}
+        .hbc-tl{top:20px;left:20px}
+        .hbc-tl::before{top:0;left:0;width:100%;height:1px;transform-origin:left;transform:scaleX(0);animation:hbLineH .8s 1s ease forwards}
+        .hbc-tl::after {top:0;left:0;width:1px;height:100%;transform-origin:top;transform:scaleY(0);animation:hbLineV .8s 1s ease forwards}
+        .hbc-tr{top:20px;right:20px}
+        .hbc-tr::before{top:0;right:0;width:100%;height:1px;transform-origin:right;transform:scaleX(0);animation:hbLineH .8s 1.05s ease forwards}
+        .hbc-tr::after {top:0;right:0;width:1px;height:100%;transform-origin:top;transform:scaleY(0);animation:hbLineV .8s 1.05s ease forwards}
+        .hbc-bl{bottom:20px;left:20px}
+        .hbc-bl::before{bottom:0;left:0;width:100%;height:1px;transform-origin:left;transform:scaleX(0);animation:hbLineH .8s 1.1s ease forwards}
+        .hbc-bl::after {bottom:0;left:0;width:1px;height:100%;transform-origin:bottom;transform:scaleY(0);animation:hbLineV .8s 1.1s ease forwards}
+        .hbc-br{bottom:20px;right:20px}
+        .hbc-br::before{bottom:0;right:0;width:100%;height:1px;transform-origin:right;transform:scaleX(0);animation:hbLineH .8s 1.15s ease forwards}
+        .hbc-br::after {bottom:0;right:0;width:1px;height:100%;transform-origin:bottom;transform:scaleY(0);animation:hbLineV .8s 1.15s ease forwards}
 
-      {/* ── SLIDE COUNTER (desktop) ───────────────────────────────────────── */}
-      <div className="absolute top-6 right-14 lg:right-16 z-30 hidden md:flex items-center gap-2">
-        <span className="font-['Jost',sans-serif] text-[0.52rem] tracking-[0.3em] uppercase text-white/35">
-          {String(current + 1).padStart(2, "0")}&nbsp;/&nbsp;{String(SLIDES.length).padStart(2, "0")}
-        </span>
+        .hb-btn{
+          position:relative;
+          display:inline-flex;
+          align-items:center;
+          gap:9px;
+          font-family:'Jost',sans-serif;
+          font-size:10px;
+          font-weight:600;
+          letter-spacing:0.22em;
+          text-transform:uppercase;
+          text-decoration:none;
+          padding:13px 26px;
+          border:1px solid rgba(255,255,255,0.45);
+          color:#ffffff;
+          background:rgba(0,0,0,0.18);
+          overflow:hidden;
+          transition:border-color 0.35s ease;
+          white-space:nowrap;
+          cursor:pointer;
+        }
+        .hb-btn::before{
+          content:'';
+          position:absolute;
+          inset:0;
+          background:#ffffff;
+          transform:translateY(102%);
+          transition:transform 0.40s cubic-bezier(0.22,1,0.36,1);
+          z-index:0;
+        }
+        .hb-btn:hover::before{transform:translateY(0)}
+        .hb-btn:hover{color:#111111;border-color:#ffffff}
+        .hb-btn>*{position:relative;z-index:1}
+
+        @media(max-width:580px){
+          .hb-btn{padding:11px 18px;font-size:9px;letter-spacing:0.18em}
+        }
+      `}</style>
+
+      {/* Parallax image */}
+      <div ref={imgRef} style={{ position:"absolute", inset:"-12% 0", zIndex:10 }}>
+        <Image
+          src="/images/hero1.webp"
+          alt="Colored Diamonds, Fine Gemstones & Jewelry Since 1988"
+          fill priority sizes="100vw"
+          style={{ objectFit:"cover", objectPosition:"center 30%" }}
+        />
       </div>
 
-      {/* ── SLIDE CONTENT ────────────────────────────────────────────────── */}
-      {SLIDES.map((slide, i) => (
-        <div
-          key={slide.id}
-          className="absolute inset-x-0 bottom-0 z-20 px-5 sm:px-10 md:px-14 lg:px-20
-                     pb-28 sm:pb-32 md:pb-36"
-          style={{
-            opacity: i === current ? 1 : 0,
-            transform: i === current ? "translateY(0)" : "translateY(20px)",
-            transition: `opacity 0.75s ease ${i === current ? "0.15s" : "0s"},
-                         transform 0.75s ease ${i === current ? "0.15s" : "0s"}`,
-            pointerEvents: i === current ? "auto" : "none",
-          }}
-        >
-          <div className="max-w-[1400px] mx-auto">
+      {/* ── Single light overlay — image stays vivid ── */}
+      {/* Gentle base tint — just enough to lift white text */}
+      <div style={{ position:"absolute", inset:0, zIndex:15, background:"rgba(0,0,0,0.28)" }} />
+      {/* Bottom gradient only — grounds the buttons without blackening the frame */}
+      <div style={{ position:"absolute", inset:0, zIndex:16, background:"linear-gradient(to top, rgba(0,0,0,0.55) 0%, transparent 45%)" }} />
+      {/* Soft top darkening for the Est. label */}
+      <div style={{ position:"absolute", inset:0, zIndex:16, background:"linear-gradient(to bottom, rgba(0,0,0,0.22) 0%, transparent 30%)" }} />
 
-            {/* Eyebrow */}
-            <div className="flex items-center gap-3 mb-4">
-              <div className="w-6 md:w-8 h-px bg-[#b8912a]" />
-              <span className="font-['Jost',sans-serif] text-[0.56rem] md:text-[0.6rem]
-                               tracking-[0.32em] uppercase font-medium text-[#b8912a]">
-                {slide.eyebrow}
-              </span>
-            </div>
+      {/* Corner brackets */}
+      <div className="hbc hbc-tl"/><div className="hbc hbc-tr"/>
+      <div className="hbc hbc-bl"/><div className="hbc hbc-br"/>
 
-            {/* Headline */}
-            <h1
-              className="font-['Playfair_Display',Georgia,serif] font-black
-                         leading-[0.9] mb-5 md:mb-7"
-              style={{
-                fontSize: "clamp(2.6rem, 8.5vw, 7.5rem)",
-                letterSpacing: "-0.015em",
-              }}
-            >
-              {slide.headline.map((line, li) => (
-                <span
-                  key={li}
-                  className="block"
-                  style={{
-                    color: li === 1 ? "transparent" : "#f5f0e8",
-                    WebkitTextStroke: li === 1 ? "1.5px rgba(245,240,232,0.85)" : "0",
-                  }}
-                >
-                  {line}
-                </span>
-              ))}
-            </h1>
+      {/* Content */}
+      <div style={{
+        position:"absolute", inset:0, zIndex:30,
+        display:"flex", flexDirection:"column",
+        alignItems:"center", justifyContent:"center",
+        textAlign:"center",
+        padding:"0 clamp(24px, 8vw, 100px)",
+      }}>
 
-            {/* Sub + CTAs */}
-            <div className="flex flex-col sm:flex-row sm:items-end
-                            gap-5 sm:gap-10 md:gap-16 max-w-2xl">
-              <p
-                className="font-['Jost',sans-serif] font-light leading-relaxed
-                           text-white/55 max-w-xs"
-                style={{ fontSize: "clamp(0.8rem, 1.4vw, 0.96rem)", letterSpacing: "0.02em" }}
-              >
-                {slide.sub}
-              </p>
-
-              <div className="flex items-center gap-4 shrink-0">
-                <Link
-                  href={slide.cta.href}
-                  className="group relative flex items-center gap-2.5 px-6 py-3
-                             font-['Jost',sans-serif] text-[0.62rem] tracking-[0.24em]
-                             uppercase font-semibold text-[#0e0d0b] overflow-hidden"
-                  style={{ background: "linear-gradient(135deg,#d4a843,#b8912a)" }}
-                >
-                  <span className="absolute inset-0 bg-white/0 group-hover:bg-white/10 transition-colors duration-300" />
-                  {slide.cta.label}
-                  <svg className="w-3 h-3 group-hover:translate-x-0.5 transition-transform duration-200 shrink-0"
-                    fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M13.5 4.5 21 12m0 0-7.5 7.5M21 12H3" />
-                  </svg>
-                </Link>
-                <Link
-                  href="/collections"
-                  className="hidden sm:block font-['Jost',sans-serif] text-[0.59rem]
-                             tracking-[0.2em] uppercase font-medium text-white/45
-                             hover:text-white/85 border-b border-white/20
-                             hover:border-white/55 pb-px transition-all duration-200"
-                >
-                  All Collections
-                </Link>
-              </div>
-            </div>
-
-          </div>
+        {/* Est label */}
+        <div className="hb-a1 hb-sans" style={{ display:"flex", alignItems:"center", gap:14, marginBottom:24 }}>
+          <span style={{ display:"block", height:"1px", width:28, background:"rgba(255,255,255,0.40)" }}/>
+          <span style={{ fontSize:9, fontWeight:500, letterSpacing:"0.44em", textTransform:"uppercase", color:"rgba(255,255,255,0.65)" }}>
+            Est. 1988
+          </span>
+          <span style={{ display:"block", height:"1px", width:28, background:"rgba(255,255,255,0.40)" }}/>
         </div>
-      ))}
 
-      {/* ── RIGHT CONTROLS ───────────────────────────────────────────────── */}
-      <div className="absolute right-3 md:right-7 top-1/2 -translate-y-1/2 z-30
-                      flex flex-col items-center gap-4">
-        <button onClick={prev_} aria-label="Previous"
-          className="w-8 h-8 flex items-center justify-center border border-white/15
-                     text-white/35 hover:text-white hover:border-white/45
-                     transition-all duration-200">
-          <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.2}>
-            <path strokeLinecap="round" strokeLinejoin="round" d="m4.5 15.75 7.5-7.5 7.5 7.5" />
-          </svg>
-        </button>
+        {/* Headline */}
+        <h1 className="hb-a2 hb-serif" style={{
+          fontSize: "clamp(38px, 6.8vw, 82px)",
+          fontWeight: 300,
+          lineHeight: 1.08,
+          letterSpacing: "-0.01em",
+          color: "#ffffff",
+          textShadow: "0 2px 20px rgba(0,0,0,0.55), 0 0 60px rgba(0,0,0,0.30)",
+          margin: "0 0 6px",
+          maxWidth: 860,
+        }}>
+          Colored Diamonds,{" "}
+          <em style={{ fontStyle:"italic", color:"#e8cc80" }}>Fine Gemstones</em>
+          {" "}&amp; Jewelry
+          <span className="hb-sans" style={{
+            fontSize: "clamp(12px, 1.5vw, 16px)",
+            fontWeight: 300,
+            letterSpacing: "0.30em",
+            textTransform: "uppercase",
+            color: "rgba(255,255,255,0.70)",
+            fontStyle: "normal",
+            display: "block",
+            marginTop: 16,
+            textShadow: "0 1px 10px rgba(0,0,0,0.5)",
+          }}>
+            Since 1988
+          </span>
+        </h1>
 
-        {SLIDES.map((_, i) => (
-          <button
-            key={i}
-            onClick={() => goTo(i)}
-            aria-label={`Slide ${i + 1}`}
-            className="flex items-center justify-center py-1"
-          >
-            <span
-              className="block rounded-full transition-all duration-500"
-              style={{
-                width: i === current ? 5 : 3,
-                height: i === current ? 18 : 3,
-                background: i === current ? "#b8912a" : "rgba(255,255,255,0.22)",
-              }}
-            />
-          </button>
-        ))}
-
-        <button onClick={next} aria-label="Next"
-          className="w-8 h-8 flex items-center justify-center border border-white/15
-                     text-white/35 hover:text-white hover:border-white/45
-                     transition-all duration-200">
-          <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.2}>
-            <path strokeLinecap="round" strokeLinejoin="round" d="m19.5 8.25-7.5 7.5-7.5-7.5" />
-          </svg>
-        </button>
-      </div>
-
-      {/* ── BOTTOM PROGRESS + LABELS ─────────────────────────────────────── */}
-      <div className="absolute bottom-0 inset-x-0 z-30
-                      px-5 sm:px-10 md:px-14 lg:px-20 pb-5 md:pb-7">
-        <div className="max-w-[1400px] mx-auto">
-
-          {/* Progress bars */}
-          <div className="flex gap-1.5 mb-2.5">
-            {SLIDES.map((_, i) => (
-              <button
-                key={i}
-                onClick={() => goTo(i)}
-                className="relative flex-1 cursor-pointer overflow-hidden"
-                style={{ height: 1, background: "rgba(255,255,255,0.14)" }}
-              >
-                <span
-                  className="absolute inset-y-0 left-0"
-                  style={{
-                    background: "linear-gradient(90deg,#b8912a,#e0be6a)",
-                    width: i === current
-                      ? `${progress}%`
-                      : i < current ? "100%" : "0%",
-                    transition: i === current ? "none" : "width 0.25s ease",
-                  }}
-                />
-              </button>
-            ))}
-          </div>
-
-          {/* Slide labels */}
-          <div className="flex items-center gap-5 md:gap-10">
-            {SLIDES.map((slide, i) => (
-              <button
-                key={i}
-                onClick={() => goTo(i)}
-                className="font-['Jost',sans-serif] text-[0.52rem] tracking-[0.22em]
-                           uppercase transition-all duration-300"
-                style={{
-                  color: i === current ? "rgba(184,145,42,0.9)" : "rgba(255,255,255,0.22)",
-                  fontWeight: i === current ? 600 : 400,
-                }}
-              >
-                {slide.accent}
-              </button>
-            ))}
-
-            {/* Spacer + pause hint */}
-            <span className="ml-auto hidden md:block font-['Jost',sans-serif]
-                             text-[0.48rem] tracking-[0.25em] uppercase text-white/18">
-              {paused ? "Paused" : "Auto"}
-            </span>
-          </div>
+        {/* Rule divider */}
+        <div className="hb-a3" style={{ display:"flex", alignItems:"center", gap:16, margin:"22px 0 30px" }}>
+          <span style={{ display:"block", height:"1px", width:44, background:"rgba(255,255,255,0.25)" }}/>
+          <span style={{ display:"block", width:3, height:3, borderRadius:"50%", background:"rgba(255,255,255,0.30)", flexShrink:0 }}/>
+          <span style={{ display:"block", height:"1px", width:44, background:"rgba(255,255,255,0.25)" }}/>
         </div>
+
+        {/* Buttons */}
+        <div className="hb-a4" style={{ display:"flex", flexWrap:"wrap", alignItems:"center", justifyContent:"center", gap:12 }}>
+          {BUTTONS.map(({ label, href, icon }) => (
+            <Link key={label} href={href} className="hb-btn">
+              {icon}
+              <span>{label}</span>
+              <svg width="10" height="10" viewBox="0 0 14 14" fill="none" style={{ opacity:0.5 }}>
+                <path d="M2 7h10M8 3l4 4-4 4" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round"/>
+              </svg>
+            </Link>
+          ))}
+        </div>
+
       </div>
 
-      {/* ── SCROLL HINT ──────────────────────────────────────────────────── */}
-      <div className="absolute bottom-7 left-1/2 -translate-x-1/2 z-30
-                      md:flex flex-col items-center gap-1.5 hidden">
-        <span className="font-['Jost',sans-serif] text-[0.45rem] tracking-[0.35em]
-                         uppercase text-white/22">Scroll</span>
-        <div className="w-px h-7 bg-gradient-to-b from-white/22 to-transparent" />
-      </div>
-
+      {/* Bottom fade */}
+      <div style={{
+        position:"absolute", bottom:0, left:0, right:0, height:70,
+        zIndex:28, pointerEvents:"none",
+        background:"linear-gradient(to bottom, transparent, rgba(3,2,1,0.35))",
+      }}/>
     </section>
   );
 }

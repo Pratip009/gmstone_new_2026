@@ -9,8 +9,13 @@ export function useApi() {
     async (url: string, options: RequestInit = {}) => {
       const activeToken = token || localStorage.getItem('auth_token');
 
+      // When body is FormData, do NOT set Content-Type — the browser sets it
+      // automatically with the correct multipart boundary. Setting it manually
+      // breaks file uploads with a 400.
+      const isFormData = options.body instanceof FormData;
+
       const headers: HeadersInit = {
-        'Content-Type': 'application/json',
+        ...(!isFormData && { 'Content-Type': 'application/json' }),
         ...(options.headers || {}),
         ...(activeToken ? { Authorization: `Bearer ${activeToken}` } : {}),
       };

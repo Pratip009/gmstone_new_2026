@@ -9,17 +9,37 @@ export interface ProductFilterParams {
   category?: string;
   subcategory?: string;
 
-  // Multi-select filters (comma-separated or array)
+  // Diamond / gemstone multi-select filters
   shape?: string | string[];
   color?: string | string[];
   clarity?: string | string[];
   certification?: string | string[];
 
-  // Range filters
+  // Diamond range filters
   priceMin?: string | number;
   priceMax?: string | number;
   sizeMin?: string | number;
   sizeMax?: string | number;
+
+  // ── Watch filters ────────────────────────────────────────────────────────
+  /** Men | Women | Unisex */
+  watchGender?: string;
+  /** Single brand or comma-separated list */
+  watchBrand?: string | string[];
+  /** Automatic | Quartz | Mechanical */
+  watchMovement?: string | string[];
+  /** Metal Bracelet | Leather | Rubber / Silicone */
+  watchStrapType?: string | string[];
+  /** Stainless Steel | Gold | Two-tone | Titanium */
+  watchCaseMaterial?: string | string[];
+  /** Black | White | Blue | Green | Gold | … */
+  watchDialColor?: string | string[];
+  /** Chronograph | Date Display | Water Resistant | Diamond Studded | Skeleton Dial */
+  watchFeatures?: string | string[];
+  /** Luxury | Casual | Sport | Dress */
+  watchStyle?: string | string[];
+  /** Small | Medium | Large */
+  watchCaseSize?: string;
 
   // Pagination
   page?: string | number;
@@ -43,7 +63,7 @@ export interface ParsedFilters {
   skip: number;
 }
 
-// ─── Helper: normalize to array ──────────────────────────────────────────────
+// ─── Helper: normalize to array ───────────────────────────────────────────────
 function toArray(val: string | string[] | undefined): string[] {
   if (!val) return [];
   if (Array.isArray(val)) return val.filter(Boolean);
@@ -58,17 +78,6 @@ function toNumber(val: string | number | undefined): number | undefined {
 }
 
 // ─── Slug resolver ────────────────────────────────────────────────────────────
-/**
- * Detects whether a string is already a valid ObjectId or a slug,
- * then resolves slugs to their ObjectId strings.
- *
- * Call this ONCE at the top of any service function that receives
- * params from URL query strings (e.g. ?category=diamonds&subcategory=loose-diamonds).
- *
- * Returns a new params object with category/subcategory replaced by ObjectId strings.
- * If a slug is not found in the DB, the filter is set to a value that matches nothing
- * so the query safely returns 0 results rather than throwing a cast error.
- */
 export async function resolveSlugFilters(
   params: ProductFilterParams
 ): Promise<ProductFilterParams> {
@@ -76,22 +85,17 @@ export async function resolveSlugFilters(
 
   const isObjectId = (val: string) => /^[a-f\d]{24}$/i.test(val);
 
-  // ── Resolve category slug ──────────────────────────────────────────────────
   if (resolved.category && !isObjectId(resolved.category)) {
     const cat = await Category.findOne({ slug: resolved.category, isActive: true })
       .select('_id')
       .lean();
-
-    // If not found, use impossible ObjectId so query returns 0 results cleanly
     resolved.category = cat ? cat._id.toString() : '000000000000000000000000';
   }
 
-  // ── Resolve subcategory slug ───────────────────────────────────────────────
   if (resolved.subcategory && !isObjectId(resolved.subcategory)) {
     const sub = await Subcategory.findOne({ slug: resolved.subcategory, isActive: true })
       .select('_id')
       .lean();
-
     resolved.subcategory = sub ? sub._id.toString() : '000000000000000000000000';
   }
 
@@ -99,26 +103,16 @@ export async function resolveSlugFilters(
 }
 
 // ─── Core Filter Builder ──────────────────────────────────────────────────────
-/**
- * Builds a MongoDB FilterQuery from URL query params.
- * Expects category/subcategory to already be ObjectId strings.
- * Call resolveSlugFilters() before this if params come from URL slugs.
- */
 export function buildProductFilterQuery(params: ProductFilterParams): ParsedFilters {
   const filter: FilterQuery<IProduct> = {};
 
   filter.isActive = true;
 
   // ── Category ───────────────────────────────────────────────────────────────
-  if (params.category) {
-    filter.category = params.category;
-  }
+  if (params.category)    filter.category    = params.category;
+  if (params.subcategory) filter.subcategory = params.subcategory;
 
-  if (params.subcategory) {
-    filter.subcategory = params.subcategory;
-  }
-
-  // ── Multi-select filters using $in ─────────────────────────────────────────
+  // ── Diamond / gemstone multi-select filters ────────────────────────────────
   const shapes = toArray(params.shape);
   if (shapes.length > 0) filter.shape = { $in: shapes };
 
@@ -131,7 +125,7 @@ export function buildProductFilterQuery(params: ProductFilterParams): ParsedFilt
   const certifications = toArray(params.certification);
   if (certifications.length > 0) filter.certification = { $in: certifications };
 
-  // ── Range filters ──────────────────────────────────────────────────────────
+  // ── Diamond range filters ──────────────────────────────────────────────────
   const priceMin = toNumber(params.priceMin);
   const priceMax = toNumber(params.priceMax);
   if (priceMin !== undefined || priceMax !== undefined) {
@@ -147,6 +141,34 @@ export function buildProductFilterQuery(params: ProductFilterParams): ParsedFilt
     if (sizeMin !== undefined) filter.size.$gte = sizeMin;
     if (sizeMax !== undefined) filter.size.$lte = sizeMax;
   }
+
+  // ── Watch filters ──────────────────────────────────────────────────────────
+
+  // Single-value selects
+  if (params.watchGender)       filter.watchGender       = params.watchGender;
+  if (params.watchCaseSize)     filter.watchCaseSize     = params.watchCaseSize;
+
+  // Multi-select watch filters
+  const watchBrands = toArray(params.watchBrand);
+  if (watchBrands.length > 0) filter.watchBrand = { $in: watchBrands };
+
+  const watchMovements = toArray(params.watchMovement);
+  if (watchMovements.length > 0) filter.watchMovement = { $in: watchMovements };
+
+  const watchStrapTypes = toArray(params.watchStrapType);
+  if (watchStrapTypes.length > 0) filter.watchStrapType = { $in: watchStrapTypes };
+
+  const watchCaseMaterials = toArray(params.watchCaseMaterial);
+  if (watchCaseMaterials.length > 0) filter.watchCaseMaterial = { $in: watchCaseMaterials };
+
+  const watchDialColors = toArray(params.watchDialColor);
+  if (watchDialColors.length > 0) filter.watchDialColor = { $in: watchDialColors };
+
+  const watchFeatures = toArray(params.watchFeatures);
+  if (watchFeatures.length > 0) filter.watchFeatures = { $in: watchFeatures };
+
+  const watchStyles = toArray(params.watchStyle);
+  if (watchStyles.length > 0) filter.watchStyle = { $in: watchStyles };
 
   // ── Stock filter ───────────────────────────────────────────────────────────
   if (params.inStock === 'true' || params.inStock === true) {
@@ -184,6 +206,7 @@ export function buildFacetsPipeline(baseFilter: FilterQuery<IProduct>) {
     { $match: baseFilter },
     {
       $facet: {
+        // Diamond facets
         shapes: [
           { $group: { _id: '$shape', count: { $sum: 1 } } },
           { $sort: { count: -1 } },
@@ -206,6 +229,55 @@ export function buildFacetsPipeline(baseFilter: FilterQuery<IProduct>) {
         sizeRange: [
           { $group: { _id: null, min: { $min: '$size' }, max: { $max: '$size' } } },
         ],
+
+        // Watch facets
+        watchGenders: [
+          { $match: { watchGender: { $exists: true } } },
+          { $group: { _id: '$watchGender', count: { $sum: 1 } } },
+          { $sort: { _id: 1 } },
+        ],
+        watchBrands: [
+          { $match: { watchBrand: { $exists: true } } },
+          { $group: { _id: '$watchBrand', count: { $sum: 1 } } },
+          { $sort: { count: -1 } },
+        ],
+        watchMovements: [
+          { $match: { watchMovement: { $exists: true } } },
+          { $group: { _id: '$watchMovement', count: { $sum: 1 } } },
+          { $sort: { count: -1 } },
+        ],
+        watchStrapTypes: [
+          { $match: { watchStrapType: { $exists: true } } },
+          { $group: { _id: '$watchStrapType', count: { $sum: 1 } } },
+          { $sort: { count: -1 } },
+        ],
+        watchCaseMaterials: [
+          { $match: { watchCaseMaterial: { $exists: true } } },
+          { $group: { _id: '$watchCaseMaterial', count: { $sum: 1 } } },
+          { $sort: { count: -1 } },
+        ],
+        watchDialColors: [
+          { $match: { watchDialColor: { $exists: true } } },
+          { $group: { _id: '$watchDialColor', count: { $sum: 1 } } },
+          { $sort: { count: -1 } },
+        ],
+        watchFeatures: [
+          { $match: { watchFeatures: { $exists: true, $not: { $size: 0 } } } },
+          { $unwind: '$watchFeatures' },
+          { $group: { _id: '$watchFeatures', count: { $sum: 1 } } },
+          { $sort: { count: -1 } },
+        ],
+        watchStyles: [
+          { $match: { watchStyle: { $exists: true } } },
+          { $group: { _id: '$watchStyle', count: { $sum: 1 } } },
+          { $sort: { count: -1 } },
+        ],
+        watchCaseSizes: [
+          { $match: { watchCaseSize: { $exists: true } } },
+          { $group: { _id: '$watchCaseSize', count: { $sum: 1 } } },
+          { $sort: { _id: 1 } },
+        ],
+
         totalCount: [{ $count: 'count' }],
       },
     },

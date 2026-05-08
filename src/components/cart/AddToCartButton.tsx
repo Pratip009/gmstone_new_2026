@@ -3,6 +3,7 @@ import { useState } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import { useApi } from '@/hooks/useApi';
 import { useRouter } from 'next/navigation';
+import { cartEvents } from '@/hooks/useCart';
 
 export default function AddToCartButton({
   productId,
@@ -33,6 +34,7 @@ export default function AddToCartButton({
         method: 'POST',
         body: JSON.stringify({ productId, quantity: qty }),
       });
+       cartEvents.refresh();
       setAdded(true);
       setTimeout(() => setAdded(false), 2000);
     } catch (err) {

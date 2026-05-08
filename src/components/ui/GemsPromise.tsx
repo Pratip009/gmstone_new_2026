@@ -169,8 +169,8 @@ export default function GemsPromise() {
       <section
         className="relative w-full overflow-hidden"
         style={{
-          background: '#faf8f4',
-          fontFamily: "'Inter', sans-serif",
+          background: '#ffffff',
+          fontFamily: "'Poppins', sans-serif",
         }}
       >
         {/* Subtle grid texture */}
@@ -220,7 +220,7 @@ export default function GemsPromise() {
                 animate={isHeadingInView ? { y: 0 } : {}}
                 transition={{ duration: 0.9, delay: 0.1, ease: [0.22, 1, 0.36, 1] }}
                 style={{
-                  fontFamily: "'DM Serif Display', serif",
+                  fontFamily: "'Poppins', sans-serif",
                   fontSize: 'clamp(34px, 6.5vw, 76px)',
                   lineHeight: 1.06,
                   fontWeight: 400,
@@ -228,10 +228,8 @@ export default function GemsPromise() {
                   letterSpacing: '-0.025em',
                 }}
               >
-                Excellence in{' '}
-                <em className="italic" style={{ color: '#c9a84c' }}>
-                  every detail
-                </em>
+                Excellence in  every detail
+                
               </motion.h2>
             </div>
 

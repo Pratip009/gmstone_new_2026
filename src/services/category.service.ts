@@ -25,7 +25,9 @@ export async function listCategories() {
 export async function createSubcategory(
   name: string,
   categoryId: string,
-  description?: string
+  description?: string,
+  imageUrl?: string,       
+  imagePublicId?: string
 ) {
   const category = await Category.findById(categoryId);
   if (!category) throw new Error('Category not found');

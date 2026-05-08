@@ -6,6 +6,8 @@ export interface ISubcategory extends Document {
   slug: string;
   category: mongoose.Types.ObjectId;
   description?: string;
+  imageUrl?: string;       // Cloudinary secure_url
+  imagePublicId?: string;  // Cloudinary public_id — required for deletion
   isActive: boolean;
   createdAt: Date;
   updatedAt: Date;
@@ -29,8 +31,10 @@ const SubcategorySchema = new Schema<ISubcategory>(
       ref: 'Category',
       required: [true, 'Category is required'],
     },
-    description: { type: String, trim: true },
-    isActive: { type: Boolean, default: true },
+    description:   { type: String, trim: true },
+    imageUrl:      { type: String, trim: true },  // ← new
+    imagePublicId: { type: String, trim: true },  // ← new
+    isActive:      { type: Boolean, default: true },
   },
   { timestamps: true }
 );
