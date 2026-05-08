@@ -1,17 +1,30 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  experimental: {
-    serverComponentsExternalPackages: ["mongoose", "csv-parser", "xlsx"], // ✅ correct key for Next.js 14.2.x
-  },
+  
+  serverExternalPackages: [
+    "mongoose",
+    "csv-parser",
+    "xlsx",
+  ],
+
   images: {
+   
     remotePatterns: [
-      { protocol: "https", hostname: "*" },
-      { protocol: "http", hostname: "*" },
+      {
+        protocol: "https",
+        hostname: "images.pexels.com",
+      },
+
+      // Add more domains here if needed
+      {
+        protocol: "https",
+        hostname: "res.cloudinary.com",
+      },
     ],
-    domains: ['images.pexels.com'],
   },
+
   env: {
-    JWT_SECRET: process.env.JWT_SECRET, // ✅ exposes to Edge middleware
+    JWT_SECRET: process.env.JWT_SECRET,
   },
 };
 
