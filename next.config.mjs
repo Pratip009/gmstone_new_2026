@@ -1,6 +1,6 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  
+
   serverExternalPackages: [
     "mongoose",
     "csv-parser",
@@ -8,17 +8,18 @@ const nextConfig = {
   ],
 
   images: {
-   
     remotePatterns: [
       {
         protocol: "https",
         hostname: "images.pexels.com",
       },
-
-      // Add more domains here if needed
       {
         protocol: "https",
         hostname: "res.cloudinary.com",
+      },
+      {
+        protocol: "https",
+        hostname: "images.unsplash.com",
       },
     ],
   },

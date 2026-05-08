@@ -394,7 +394,7 @@ export default function MegaMenu() {
       `}</style>
 
       {/* Desktop wrapper */}
-      <div ref={wrapRef} className="mm" style={{ position: 'static' }}>
+      <div ref={wrapRef} className="mm" style={{ position: 'relative' }}>
 
         <button
           className="mm-trigger"
