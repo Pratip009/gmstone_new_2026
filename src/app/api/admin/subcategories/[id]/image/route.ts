@@ -10,16 +10,15 @@ import { successResponse, errorResponse } from '@/lib/api-response';
 import { uploadBuffer, destroyImage } from '@/lib/cloudinary';
 import Subcategory from '@/models/Subcategory';
 
-type Ctx = { params: Record<string, string> };
+type Ctx = { params: Promise<{ id: string }> };
 
 // ── POST ─────────────────────────────────────────────────────────────────────
-// Body: multipart/form-data with a single field named "image" (File).
-// Used by the "Add image" / "Replace image" flow on existing subcategories.
 export const POST = withAdmin(async (req: NextRequest, ctx: Ctx) => {
   try {
     await connectDB();
 
-    const sub = await Subcategory.findById(ctx.params.id);
+    const { id } = await ctx.params;
+    const sub = await Subcategory.findById(id);
     if (!sub) return errorResponse('Subcategory not found', 404);
 
     const form = await req.formData();
@@ -46,12 +45,12 @@ export const POST = withAdmin(async (req: NextRequest, ctx: Ctx) => {
 });
 
 // ── DELETE ────────────────────────────────────────────────────────────────────
-// Removes the Cloudinary asset and clears the image fields on the document.
 export const DELETE = withAdmin(async (_req: NextRequest, ctx: Ctx) => {
   try {
     await connectDB();
 
-    const sub = await Subcategory.findById(ctx.params.id);
+    const { id } = await ctx.params;
+    const sub = await Subcategory.findById(id);
     if (!sub) return errorResponse('Subcategory not found', 404);
 
     if (sub.imagePublicId) {

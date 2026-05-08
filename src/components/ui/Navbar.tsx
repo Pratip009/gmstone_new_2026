@@ -24,11 +24,16 @@ interface NavCategory {
 
 // ── Data fetching hook ───────────────────────────────────────────────────────
 
-function useNavCategories() {
-  const [categories, setCategories] = useState<NavCategory[]>([]);
-  const [loading, setLoading] = useState(true);
+// ── Data fetching hook ───────────────────────────────────────────────────────
+
+function useNavCategories(initialCategories: NavCategory[]) {
+  const [categories, setCategories] = useState<NavCategory[]>(initialCategories);
+  const [loading, setLoading] = useState(initialCategories.length === 0);
 
   useEffect(() => {
+    // If we already have SSR data, skip the client fetch entirely
+    if (initialCategories.length > 0) return;
+
     let cancelled = false;
     fetch("/api/categories?withSubcategories=true")
       .then((r) => r.json())
@@ -52,8 +57,9 @@ function useNavCategories() {
       .finally(() => {
         if (!cancelled) setLoading(false);
       });
+
     return () => { cancelled = true; };
-  }, []);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   return { categories, loading };
 }
@@ -62,11 +68,11 @@ const MAX_VISIBLE_SUBS = 7;
 
 // ── Main Navbar ──────────────────────────────────────────────────────────────
 
-export default function Navbar() {
+export default function Navbar({ initialCategories = [] }: { initialCategories?: NavCategory[] }) {
   const { user, logout, isAdmin } = useAuth();
   const { cartCount } = useCart();
   const router = useRouter();
-  const { categories, loading } = useNavCategories();
+const { categories, loading } = useNavCategories(initialCategories);
 
   const [scrolled, setScrolled] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
@@ -178,8 +184,8 @@ export default function Navbar() {
         }
         .nav-cat-tab:hover,
         .nav-cat-tab.active {
-          color: #4f46e5;
-          border-bottom-color: #4f46e5;
+          color: #0f3460;
+          border-bottom-color: #0f3460;
         }
         .nav-cat-tab .chevron {
           transition: transform 0.22s ease;
@@ -205,7 +211,7 @@ export default function Navbar() {
         }
         .sub-link:hover {
           background: #f5f3ff;
-          color: #4f46e5;
+          color: #0f3460;
           padding-left: 26px;
         }
         .sub-link::before {
@@ -218,7 +224,7 @@ export default function Navbar() {
           transition: background 0.15s;
         }
         .sub-link:hover::before {
-          background: #4f46e5;
+          background: #0f3460;
         }
 
         .sub-link-grid {
@@ -239,7 +245,7 @@ export default function Navbar() {
         }
         .sub-link-grid:hover {
           background: #f5f3ff;
-          color: #4f46e5;
+          color: #0f3460;
         }
         .sub-link-grid::before {
           content: '';
@@ -251,7 +257,7 @@ export default function Navbar() {
           transition: background 0.15s;
         }
         .sub-link-grid:hover::before {
-          background: #4f46e5;
+          background: #0f3460;
         }
 
         .see-more-btn {
@@ -263,7 +269,7 @@ export default function Navbar() {
           font-size: 12px;
           font-family: 'Poppins', sans-serif;
           font-weight: 600;
-          color: #4f46e5;
+          color: #0f3460;
           letter-spacing: 0.04em;
           text-transform: uppercase;
           background: transparent;
@@ -288,7 +294,7 @@ export default function Navbar() {
           transition: color 0.15s, background 0.15s;
         }
         .nav-toplink:hover {
-          color: #4f46e5;
+          color: #0f3460;
           background: #f5f3ff;
         }
 
@@ -308,7 +314,7 @@ export default function Navbar() {
           transition: color 0.15s, background 0.15s;
         }
         .profile-btn:hover {
-          color: #4f46e5;
+          color: #0f3460;
           background: #f5f3ff;
         }
 
@@ -324,7 +330,7 @@ export default function Navbar() {
         }
         .dropdown-item-link:hover {
           background: #f5f3ff;
-          color: #4f46e5;
+          color: #0f3460;
         }
 
         .cart-link {
@@ -342,7 +348,7 @@ export default function Navbar() {
           transition: color 0.15s, background 0.15s;
         }
         .cart-link:hover {
-          color: #4f46e5;
+          color: #0f3460;
           background: #f5f3ff;
         }
       `}</style>
@@ -389,7 +395,7 @@ export default function Navbar() {
             style={{ display: "flex", alignItems: "center", gap: "10px", textDecoration: "none", flexShrink: 0 }}>
             <div style={{
               width: 36, height: 36,
-              background: "linear-gradient(135deg, #1a1a2e 0%, #4f46e5 100%)",
+              background: "linear-gradient(135deg, #1a1a2e 0%, #0f3460 100%)",
               borderRadius: 10,
               display: "flex", alignItems: "center", justifyContent: "center",
               boxShadow: "0 4px 12px rgba(79,70,229,0.3)",
@@ -459,7 +465,7 @@ export default function Navbar() {
                     <button className="profile-btn" onClick={() => setProfileOpen(!profileOpen)}>
                       <div style={{
                         width: 26, height: 26,
-                        background: "linear-gradient(135deg, #4f46e5, #7c3aed)",
+                        background: "linear-gradient(135deg, #0f3460, #7c3aed)",
                         borderRadius: "50%",
                         display: "flex", alignItems: "center", justifyContent: "center",
                         fontSize: "11px", fontWeight: 700, color: "#fff",
@@ -476,7 +482,7 @@ export default function Navbar() {
                       position: "absolute", right: 0, top: "calc(100% + 8px)",
                       width: "230px", background: "#ffffff",
                       border: "1px solid #e8e8f0",
-                      borderTop: "3px solid #4f46e5",
+                      borderTop: "3px solid #0f3460",
                       borderRadius: "0 0 12px 12px",
                       boxShadow: "0 16px 48px rgba(79,70,229,0.14)",
                       opacity: profileOpen ? 1 : 0,
@@ -515,7 +521,7 @@ export default function Navbar() {
                     Cart
                     {cartCount > 0 && (
                       <span style={{
-                        background: "linear-gradient(135deg, #4f46e5, #7c3aed)",
+                        background: "linear-gradient(135deg, #0f3460, #7c3aed)",
                         color: "#fff", fontSize: "9px", fontWeight: 700,
                         borderRadius: "50%", width: "17px", height: "17px",
                         display: "inline-flex", alignItems: "center", justifyContent: "center",
@@ -534,7 +540,7 @@ export default function Navbar() {
                     fontFamily: "'Poppins', sans-serif",
                     fontSize: "13px", fontWeight: 600,
                     color: "#ffffff",
-                    background: "linear-gradient(135deg, #4f46e5, #7c3aed)",
+                    background: "linear-gradient(135deg, #0f3460, #7c3aed)",
                     textDecoration: "none", padding: "7px 18px",
                     borderRadius: "8px",
                     boxShadow: "0 3px 10px rgba(79,70,229,0.3)",
@@ -573,7 +579,7 @@ export default function Navbar() {
                 fontFamily: "'Poppins', sans-serif", fontWeight: 400,
                 textDecoration: "none", transition: "color 0.15s",
               }}
-                onMouseEnter={e => (e.currentTarget.style.color = "#4f46e5")}
+                onMouseEnter={e => (e.currentTarget.style.color = "#0f3460")}
                 onMouseLeave={e => (e.currentTarget.style.color = "#7c7c9a")}
               >
                 <svg width="11" height="11" viewBox="0 0 24 24" fill="none">
@@ -587,7 +593,7 @@ export default function Navbar() {
                 fontFamily: "'Poppins', sans-serif", fontWeight: 400,
                 textDecoration: "none", transition: "color 0.15s",
               }}
-                onMouseEnter={e => (e.currentTarget.style.color = "#4f46e5")}
+                onMouseEnter={e => (e.currentTarget.style.color = "#0f3460")}
                 onMouseLeave={e => (e.currentTarget.style.color = "#7c7c9a")}
               >
                 <svg width="11" height="11" viewBox="0 0 24 24" fill="none">
@@ -613,7 +619,7 @@ export default function Navbar() {
                   <span style={{
                     position: "absolute", top: "-5px", right: "-7px",
                     width: "15px", height: "15px",
-                    background: "linear-gradient(135deg, #4f46e5, #7c3aed)",
+                    background: "linear-gradient(135deg, #0f3460, #7c3aed)",
                     color: "#fff", fontSize: "8px", fontWeight: 700, borderRadius: "50%",
                     display: "flex", alignItems: "center", justifyContent: "center",
                   }}>
@@ -687,7 +693,7 @@ export default function Navbar() {
                         width: isExpanded ? "660px" : "240px",
                         background: "#ffffff",
                         border: "1px solid #e8e4f8",
-                        borderTop: "3px solid #4f46e5",
+                        borderTop: "3px solid #0f3460",
                         borderRadius: "0 0 14px 14px",
                         boxShadow: "0 20px 60px rgba(79,70,229,0.12), 0 4px 16px rgba(0,0,0,0.06)",
                         zIndex: 9999,
@@ -708,7 +714,7 @@ export default function Navbar() {
                           display: "flex", alignItems: "center", justifyContent: "space-between",
                           padding: "12px 20px",
                           fontSize: "11.5px", letterSpacing: "0.1em", textTransform: "uppercase",
-                          color: "#4f46e5", textDecoration: "none",
+                          color: "#0f3460", textDecoration: "none",
                           fontFamily: "'Poppins', sans-serif", fontWeight: 700,
                           borderBottom: "1px solid #f0eeff", marginBottom: "4px",
                           background: "#faf9ff",
@@ -852,14 +858,14 @@ export default function Navbar() {
                   {hasSubs && (
                     <div style={{
                       width: 28, height: 28,
-                      background: isExpanded ? "#4f46e5" : "#f5f3ff",
+                      background: isExpanded ? "#0f3460" : "#f5f3ff",
                       borderRadius: "50%",
                       display: "flex", alignItems: "center", justifyContent: "center",
                       transition: "background 0.2s",
                     }}>
                       <svg width="11" height="11" viewBox="0 0 10 10" fill="none"
                         style={{ transition: "transform 0.22s", transform: isExpanded ? "rotate(180deg)" : "rotate(0)" }}>
-                        <path d="M2 3.5L5 6.5L8 3.5" stroke={isExpanded ? "#fff" : "#4f46e5"} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+                        <path d="M2 3.5L5 6.5L8 3.5" stroke={isExpanded ? "#fff" : "#0f3460"} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
                       </svg>
                     </div>
                   )}
@@ -875,7 +881,7 @@ export default function Navbar() {
                       style={{
                         display: "block", padding: "11px 16px",
                         fontSize: "11.5px", letterSpacing: "0.09em", textTransform: "uppercase",
-                        color: "#4f46e5", fontWeight: 700, textDecoration: "none",
+                        color: "#0f3460", fontWeight: 700, textDecoration: "none",
                         fontFamily: "'Poppins', sans-serif",
                         background: "#f5f3ff", borderRadius: 6, marginBottom: 4,
                       }}>
@@ -930,7 +936,7 @@ export default function Navbar() {
                 }}>
                   <div style={{
                     width: 40, height: 40,
-                    background: "linear-gradient(135deg, #4f46e5, #7c3aed)",
+                    background: "linear-gradient(135deg, #0f3460, #7c3aed)",
                     borderRadius: "50%",
                     display: "flex", alignItems: "center", justifyContent: "center",
                     fontSize: "16px", fontWeight: 700, color: "#fff",
@@ -965,7 +971,7 @@ export default function Navbar() {
                   display: "block", textAlign: "center",
                   fontSize: "14px", fontWeight: 600, letterSpacing: "0.02em",
                   color: "#ffffff",
-                  background: "linear-gradient(135deg, #4f46e5, #7c3aed)",
+                  background: "linear-gradient(135deg, #0f3460, #7c3aed)",
                   padding: "14px 24px", textDecoration: "none",
                   fontFamily: "'Poppins', sans-serif",
                   borderRadius: "10px",

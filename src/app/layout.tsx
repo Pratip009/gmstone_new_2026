@@ -1,3 +1,4 @@
+// app/layout.tsx
 import type { Metadata } from "next";
 import Providers from "./providers";
 import "./global.css";
@@ -8,11 +9,7 @@ export const metadata: Metadata = {
   description: "Curated collection of premium diamonds and gemstones",
 };
 
-export default function RootLayout({
-  children,
-}: {
-  children: React.ReactNode;
-}) {
+export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en">
       <head>

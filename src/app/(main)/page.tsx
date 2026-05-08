@@ -4,6 +4,7 @@ import ShopByCategory from "@/components/ui/Shopbycategory";
 import TrustBadges from "@/components/ui/TrustBadges";
 import Testimonials from "@/components/ui/Testimonials";
 import SpecialsMarquee from "@/components/ui/Specialsmarquee";
+import FeaturedInNews from "@/components/ui/FeaturedInNews";
 
 export default function HomePage() {
   return (
@@ -16,6 +17,7 @@ export default function HomePage() {
       <SpecialsMarquee/>
       <GemsPromise />
       <Testimonials/>
+      <FeaturedInNews/>
     </main>
   );
 }

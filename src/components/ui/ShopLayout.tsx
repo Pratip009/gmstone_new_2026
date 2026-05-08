@@ -525,9 +525,9 @@ export default function ShopLayout() {
 
   // Category click → /products?category=<cat-slug>
   function handleSelectCat(cat: ICategory) {
-    setMobileOpen(false);
-    router.push(`/products?category=${cat.slug}`);
-  }
+  setMobileOpen(false);
+  router.push(`/category/${cat.slug}`);
+}
 
   // ── Local-only handlers used by breadcrumb (stay on page) ────────────────
   function handleSelectCatLocal(cat: ICategory) {

@@ -1,19 +1,312 @@
 'use client';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, useCallback } from 'react';
 import { useApi } from '@/hooks/useApi';
 import {
   Plus, Tag, Layers, CheckCircle2, AlertCircle,
   Search, Trash2, ChevronRight, FolderOpen, Folder, FileDown,
-  ImagePlus, X, Upload,
+  ImagePlus, X, Upload, Pencil,
+  Bold, Italic, List, ListOrdered, Heading2, Heading3,
+  Quote, Minus, RotateCcw, RotateCw, Link, AlignLeft,
 } from 'lucide-react';
 
-interface Category    { _id: string; name: string; slug: string; }
+interface Category    { _id: string; name: string; slug: string; description?: string; }
 interface Subcategory {
   _id: string; name: string; slug: string;
   category: { _id: string; name: string };
-  imageUrl?: string;   // ← new
+  imageUrl?: string;
 }
 
+// ─── Minimal Rich Text Editor ─────────────────────────────────────────────────
+interface RichEditorProps {
+  value: string;
+  onChange: (html: string) => void;
+  placeholder?: string;
+}
+
+function RichEditor({ value, onChange, placeholder }: RichEditorProps) {
+  const editorRef = useRef<HTMLDivElement>(null);
+  const isInternalUpdate = useRef(false);
+
+  // Sync external value → DOM (only when not typing)
+  useEffect(() => {
+    if (!editorRef.current) return;
+    if (isInternalUpdate.current) { isInternalUpdate.current = false; return; }
+    if (editorRef.current.innerHTML !== value) {
+      editorRef.current.innerHTML = value;
+    }
+  }, [value]);
+
+  const exec = useCallback((cmd: string, val?: string) => {
+    editorRef.current?.focus();
+    document.execCommand(cmd, false, val);
+    if (editorRef.current) {
+      isInternalUpdate.current = true;
+      onChange(editorRef.current.innerHTML);
+    }
+  }, [onChange]);
+
+  const handleInput = useCallback(() => {
+    if (editorRef.current) {
+      isInternalUpdate.current = true;
+      onChange(editorRef.current.innerHTML);
+    }
+  }, [onChange]);
+
+  const insertLink = () => {
+    const url = prompt('Enter URL:', 'https://');
+    if (url) exec('createLink', url);
+  };
+
+  const toolbarBtn = (
+    icon: React.ReactNode,
+    cmd: string,
+    val?: string,
+    title?: string,
+    onClick?: () => void,
+  ) => (
+    <button
+      type="button"
+      title={title}
+      onMouseDown={(e) => {
+        e.preventDefault();
+        onClick ? onClick() : exec(cmd, val);
+      }}
+      className="w-7 h-7 flex items-center justify-center rounded-md text-[#6b6560] hover:bg-[#f0ece4] hover:text-[#1a1714] transition-all"
+    >
+      {icon}
+    </button>
+  );
+
+  return (
+    <div className="flex flex-col rounded-xl border border-[#e2ddd5] bg-[#faf9f6] overflow-hidden focus-within:border-[#c9a84c] focus-within:ring-2 focus-within:ring-[#c9a84c]/10 transition-all">
+      {/* Toolbar */}
+      <div className="flex flex-wrap items-center gap-0.5 px-2 py-1.5 border-b border-[#e2ddd5] bg-white">
+        {toolbarBtn(<Bold size={13} strokeWidth={2.2} />, 'bold', undefined, 'Bold')}
+        {toolbarBtn(<Italic size={13} strokeWidth={2} />, 'italic', undefined, 'Italic')}
+        <div className="w-px h-4 bg-[#e2ddd5] mx-0.5" />
+        {toolbarBtn(<Heading2 size={13} strokeWidth={1.8} />, 'formatBlock', '<h2>', 'Heading 2')}
+        {toolbarBtn(<Heading3 size={13} strokeWidth={1.8} />, 'formatBlock', '<h3>', 'Heading 3')}
+        {toolbarBtn(<AlignLeft size={13} strokeWidth={1.8} />, 'formatBlock', '<p>', 'Paragraph')}
+        <div className="w-px h-4 bg-[#e2ddd5] mx-0.5" />
+        {toolbarBtn(<List size={13} strokeWidth={1.8} />, 'insertUnorderedList', undefined, 'Bullet List')}
+        {toolbarBtn(<ListOrdered size={13} strokeWidth={1.8} />, 'insertOrderedList', undefined, 'Numbered List')}
+        {toolbarBtn(<Quote size={13} strokeWidth={1.8} />, 'formatBlock', '<blockquote>', 'Blockquote')}
+        <div className="w-px h-4 bg-[#e2ddd5] mx-0.5" />
+        {toolbarBtn(<Minus size={13} strokeWidth={1.8} />, 'insertHorizontalRule', undefined, 'Divider')}
+        {toolbarBtn(<Link size={13} strokeWidth={1.8} />, 'createLink', undefined, 'Insert Link', insertLink)}
+        <div className="w-px h-4 bg-[#e2ddd5] mx-0.5" />
+        {toolbarBtn(<RotateCcw size={12} strokeWidth={2} />, 'undo', undefined, 'Undo')}
+        {toolbarBtn(<RotateCw size={12} strokeWidth={2} />, 'redo', undefined, 'Redo')}
+      </div>
+
+      {/* Editable area */}
+      <div
+        ref={editorRef}
+        contentEditable
+        suppressContentEditableWarning
+        onInput={handleInput}
+        data-placeholder={placeholder}
+        className="rich-editor-body min-h-[220px] max-h-[360px] overflow-y-auto px-4 py-3 text-[0.85rem] text-[#1a1714] leading-relaxed outline-none"
+      />
+
+      {/* Prose styles injected via <style> */}
+      <style>{`
+        .rich-editor-body:empty:before {
+          content: attr(data-placeholder);
+          color: #c8c2b8;
+          pointer-events: none;
+        }
+        .rich-editor-body h2 {
+          font-family: 'Cormorant Garamond', serif;
+          font-size: 1.25rem;
+          font-weight: 600;
+          color: #1a1714;
+          margin: 0.75em 0 0.35em;
+          border-bottom: 1px solid #e2ddd5;
+          padding-bottom: 4px;
+        }
+        .rich-editor-body h3 {
+          font-family: 'Cormorant Garamond', serif;
+          font-size: 1.05rem;
+          font-weight: 600;
+          color: #3a3530;
+          margin: 0.65em 0 0.25em;
+        }
+        .rich-editor-body p { margin: 0.4em 0; }
+        .rich-editor-body ul {
+          list-style: disc;
+          padding-left: 1.4em;
+          margin: 0.4em 0;
+        }
+        .rich-editor-body ol {
+          list-style: decimal;
+          padding-left: 1.4em;
+          margin: 0.4em 0;
+        }
+        .rich-editor-body li { margin: 0.2em 0; }
+        .rich-editor-body blockquote {
+          border-left: 3px solid #c9a84c;
+          margin: 0.5em 0;
+          padding: 4px 12px;
+          color: #6b6560;
+          font-style: italic;
+          background: #fdf9f0;
+        }
+        .rich-editor-body hr {
+          border: none;
+          border-top: 1px solid #e2ddd5;
+          margin: 0.75em 0;
+        }
+        .rich-editor-body a {
+          color: #7ab0c9;
+          text-decoration: underline;
+        }
+        .rich-editor-body strong { font-weight: 700; }
+        .rich-editor-body em { font-style: italic; }
+      `}</style>
+    </div>
+  );
+}
+
+// ─── Edit Category Modal ──────────────────────────────────────────────────────
+interface EditCategoryModalProps {
+  category: Category;
+  onClose: () => void;
+  onSave: (id: string, name: string, description: string) => Promise<void>;
+  loading: boolean;
+}
+
+function EditCategoryModal({ category, onClose, onSave, loading }: EditCategoryModalProps) {
+  const [name, setName] = useState(category.name);
+  const [desc, setDesc] = useState(category.description ?? '');
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    await onSave(category._id, name, desc);
+  };
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center p-4"
+      style={{ background: 'rgba(26,23,20,0.6)', backdropFilter: 'blur(6px)' }}
+    >
+      <div
+        className="bg-white rounded-2xl shadow-2xl border border-[#ede9e1] w-full flex flex-col"
+        style={{ maxWidth: 680, maxHeight: '90vh' }}
+      >
+        {/* Modal header */}
+        <div className="flex items-center justify-between px-6 pt-5 pb-4 border-b border-[#f0ece4] flex-shrink-0">
+          <div className="flex items-center gap-3">
+            <div className="w-9 h-9 rounded-xl bg-[#c9a84c]/10 border border-[#c9a84c]/20 flex items-center justify-center">
+              <Pencil size={14} strokeWidth={1.8} className="text-[#c9a84c]" />
+            </div>
+            <div>
+              <h3 className="text-[0.92rem] font-semibold text-[#1a1714]">Edit Category</h3>
+              <p className="text-[0.7rem] text-[#a09a90] font-mono">{category.slug}</p>
+            </div>
+          </div>
+          <button
+            onClick={onClose}
+            className="p-1.5 rounded-lg text-[#c8c2b8] hover:bg-[#f7f5f1] hover:text-[#6b6560] transition-all"
+          >
+            <X size={16} strokeWidth={2} />
+          </button>
+        </div>
+
+        {/* Modal body — scrollable */}
+        <form onSubmit={handleSubmit} className="flex flex-col flex-1 overflow-hidden">
+          <div className="flex-1 overflow-y-auto px-6 py-5 flex flex-col gap-5">
+
+            {/* Name field */}
+            <div className="flex flex-col gap-1.5">
+              <label className="text-[0.65rem] font-bold tracking-[0.09em] uppercase text-[#a09a90]">
+                Category Name
+              </label>
+              <input
+                className="w-full px-3 py-2.5 rounded-lg border border-[#e2ddd5] bg-[#faf9f6] text-[0.88rem] text-[#1a1714] placeholder:text-[#c8c2b8] focus:outline-none focus:border-[#c9a84c] focus:ring-2 focus:ring-[#c9a84c]/10 transition-all font-medium"
+                placeholder="Category name"
+                value={name}
+                onChange={e => setName(e.target.value)}
+                required
+              />
+            </div>
+
+            {/* Rich text description */}
+            <div className="flex flex-col gap-1.5">
+              <div className="flex items-center justify-between">
+                <label className="text-[0.65rem] font-bold tracking-[0.09em] uppercase text-[#a09a90]">
+                  Description
+                  <span className="normal-case font-normal text-[#c8c2b8] ml-1">(rich text)</span>
+                </label>
+                {desc && (
+                  <button
+                    type="button"
+                    onClick={() => setDesc('')}
+                    className="text-[0.65rem] text-[#c8c2b8] hover:text-red-400 transition-colors"
+                  >
+                    Clear
+                  </button>
+                )}
+              </div>
+              <RichEditor
+                value={desc}
+                onChange={setDesc}
+                placeholder="Write a detailed description for this category. Supports rich formatting — headings, bold, lists, quotes…"
+              />
+              <p className="text-[0.65rem] text-[#c8c2b8]">
+                This description appears on the category landing page shown to customers.
+              </p>
+            </div>
+
+            {/* Live preview */}
+            {desc && desc !== '<br>' && (
+              <div className="flex flex-col gap-1.5">
+                <label className="text-[0.65rem] font-bold tracking-[0.09em] uppercase text-[#a09a90]">
+                  Preview
+                </label>
+                <div
+                  className="rounded-xl border border-[#e2ddd5] bg-gradient-to-br from-[#1a2a5e] to-[#0e1a40] px-5 py-4"
+                  style={{ fontFamily: "'Playfair Display', Georgia, serif" }}
+                >
+                  <p className="text-[0.62rem] tracking-[0.22em] uppercase text-[#c8a96e] font-sans mb-1.5">
+                    As seen on category page
+                  </p>
+                  <div
+                    className="text-[0.82rem] text-white/70 italic leading-relaxed line-clamp-4"
+                    dangerouslySetInnerHTML={{ __html: desc }}
+                  />
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Footer actions */}
+          <div className="flex gap-2.5 px-6 py-4 border-t border-[#f0ece4] bg-[#faf9f6] flex-shrink-0">
+            <button
+              type="button"
+              onClick={onClose}
+              className="flex-1 py-2.5 rounded-xl border border-[#e2ddd5] text-[#6b6560] text-[0.8rem] font-semibold hover:bg-white transition-all"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              disabled={loading || !name.trim()}
+              className="flex-1 py-2.5 rounded-xl bg-[#1a1714] text-white text-[0.8rem] font-semibold hover:bg-[#2a2420] disabled:opacity-50 transition-all flex items-center justify-center gap-2"
+            >
+              {loading
+                ? <><span className="w-3.5 h-3.5 rounded-full border-2 border-white/30 border-t-white animate-spin" /> Saving…</>
+                : <><CheckCircle2 size={13} strokeWidth={2} /> Save Changes</>
+              }
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
+
+// ─── Main Page ────────────────────────────────────────────────────────────────
 export default function AdminCategoriesPage() {
   const { apiFetch } = useApi();
   const [categories,    setCategories]    = useState<Category[]>([]);
@@ -32,15 +325,15 @@ export default function AdminCategoriesPage() {
   const subImageRef = useRef<HTMLInputElement>(null);
 
   const [loading,   setLoading]   = useState(false);
+  const [editLoading, setEditLoading] = useState(false);
   const [msg,       setMsg]       = useState<{ text: string; type: 'success' | 'error' } | null>(null);
   const [search,    setSearch]    = useState('');
   const [subSearch, setSubSearch] = useState('');
 
-  // delete modals
-  const [deletingCat, setDeletingCat] = useState<string | null>(null);
-  const [deletingSub, setDeletingSub] = useState<string | null>(null);
-
-  // "add image to existing subcategory" modal
+  // modals
+  const [deletingCat,  setDeletingCat]  = useState<string | null>(null);
+  const [deletingSub,  setDeletingSub]  = useState<string | null>(null);
+  const [editingCat,   setEditingCat]   = useState<Category | null>(null);
   const [uploadingSub,  setUploadingSub]  = useState<string | null>(null);
   const [uploadFile,    setUploadFile]    = useState<File | null>(null);
   const [uploadPreview, setUploadPreview] = useState<string | null>(null);
@@ -155,14 +448,10 @@ export default function AdminCategoriesPage() {
     e.preventDefault();
     setLoading(true);
     try {
-      // Use FormData so the image file can travel alongside the text fields.
-      // The browser sets the correct multipart Content-Type with boundary automatically
-      // — do NOT manually set Content-Type when sending FormData.
       const fd = new FormData();
       fd.append('name', subName);
       fd.append('categoryId', subCat);
       if (subImage) fd.append('image', subImage);
-
       await apiFetch('/api/admin/subcategories', { method: 'POST', body: fd });
       flash('Subcategory created', 'success');
       setSubName(''); setSubCat('');
@@ -172,6 +461,22 @@ export default function AdminCategoriesPage() {
     } catch (err) {
       flash(err instanceof Error ? err.message : 'Failed', 'error');
     } finally { setLoading(false); }
+  };
+
+  // ── edit category ──────────────────────────────────────────────────────────
+  const saveCategory = async (id: string, name: string, description: string) => {
+    setEditLoading(true);
+    try {
+      await apiFetch(`/api/admin/categories/${id}`, {
+        method: 'PATCH',
+        body: JSON.stringify({ name, description }),
+      });
+      flash('Category updated', 'success');
+      setEditingCat(null);
+      fetchAll();
+    } catch (err) {
+      flash(err instanceof Error ? err.message : 'Failed to update', 'error');
+    } finally { setEditLoading(false); }
   };
 
   // ── upload image to existing subcategory ───────────────────────────────────
@@ -318,22 +623,29 @@ export default function AdminCategoriesPage() {
                         {count}
                       </span>
                     )}
-                    {!isActive && (
-                      <button
-                        onClick={e => { e.stopPropagation(); setDeletingCat(cat._id); }}
-                        className="opacity-0 group-hover:opacity-100 transition-opacity p-1 rounded-lg hover:bg-red-50 text-[#c8c2b8] hover:text-red-400"
-                      >
-                        <Trash2 size={12} strokeWidth={1.8} />
-                      </button>
-                    )}
-                    {isActive && (
-                      <button
-                        onClick={e => { e.stopPropagation(); setDeletingCat(cat._id); }}
-                        className="p-1 rounded-lg text-white/30 hover:text-red-400 hover:bg-white/10 transition-all"
-                      >
-                        <Trash2 size={12} strokeWidth={1.8} />
-                      </button>
-                    )}
+
+                    {/* Edit button */}
+                    <button
+                      onClick={e => { e.stopPropagation(); setEditingCat(cat); }}
+                      title="Edit category"
+                      className={`opacity-0 group-hover:opacity-100 transition-opacity p-1 rounded-lg
+                        ${isActive
+                          ? 'text-white/40 hover:text-[#c9a84c] hover:bg-white/10'
+                          : 'text-[#c8c2b8] hover:bg-[#fdf9f0] hover:text-[#c9a84c]'}`}
+                    >
+                      <Pencil size={11} strokeWidth={2} />
+                    </button>
+
+                    {/* Delete button */}
+                    <button
+                      onClick={e => { e.stopPropagation(); setDeletingCat(cat._id); }}
+                      className={`opacity-0 group-hover:opacity-100 transition-opacity p-1 rounded-lg
+                        ${isActive
+                          ? 'text-white/30 hover:text-red-400 hover:bg-white/10'
+                          : 'text-[#c8c2b8] hover:bg-red-50 hover:text-red-400'}`}
+                    >
+                      <Trash2 size={11} strokeWidth={1.8} />
+                    </button>
                   </div>
                 </li>
               );
@@ -351,6 +663,14 @@ export default function AdminCategoriesPage() {
                   <ChevronRight size={11} strokeWidth={2} className="text-[#c9a84c]" />
                   <span className="text-[0.8rem] font-semibold text-[#1a1714]">{activeCatObj.name}</span>
                   <span className="text-[0.7rem] text-[#a09a90]">· {visibleSubs.length} {visibleSubs.length === 1 ? 'item' : 'items'}</span>
+                  {/* Quick edit from header */}
+                  <button
+                    onClick={() => setEditingCat(activeCatObj)}
+                    className="ml-1 p-1 rounded-md text-[#c8c2b8] hover:text-[#c9a84c] hover:bg-[#fdf9f0] transition-all"
+                    title="Edit category description"
+                  >
+                    <Pencil size={10} strokeWidth={2} />
+                  </button>
                 </div>
               ) : (
                 <p className="text-[0.75rem] text-[#c8c2b8]">Select a category</p>
@@ -391,11 +711,9 @@ export default function AdminCategoriesPage() {
                     key={sub._id}
                     className="group relative flex flex-col rounded-xl border border-[#ede9e1] bg-[#faf9f6] hover:border-[#7ab0c9]/40 hover:bg-white transition-all duration-150 overflow-hidden"
                   >
-                    {/* ── image area ── */}
                     {sub.imageUrl ? (
                       <div className="relative w-full h-28 bg-[#f0ece4] overflow-hidden">
                         <img src={sub.imageUrl} alt={sub.name} className="w-full h-full object-cover" />
-                        {/* hover overlay — click to replace */}
                         <button
                           onClick={() => { setUploadingSub(sub._id); setUploadFile(null); setUploadPreview(null); }}
                           className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity bg-black/40 flex items-center justify-center gap-1.5 text-white text-[0.72rem] font-semibold"
@@ -404,7 +722,6 @@ export default function AdminCategoriesPage() {
                         </button>
                       </div>
                     ) : (
-                      /* no image — dashed upload prompt */
                       <button
                         onClick={() => { setUploadingSub(sub._id); setUploadFile(null); setUploadPreview(null); }}
                         className="w-full h-20 flex flex-col items-center justify-center gap-1.5 border-b border-dashed border-[#e2ddd5] bg-[#f7f5f1] hover:bg-[#f0ece4] text-[#c8c2b8] hover:text-[#a09a90] transition-colors"
@@ -413,8 +730,6 @@ export default function AdminCategoriesPage() {
                         <span className="text-[0.65rem] font-medium">Add image</span>
                       </button>
                     )}
-
-                    {/* ── text + delete ── */}
                     <div className="flex items-center gap-3 px-4 py-3">
                       <span className="w-7 h-7 rounded-lg bg-[#7ab0c9]/10 border border-[#7ab0c9]/20 flex items-center justify-center flex-shrink-0">
                         <Layers size={12} strokeWidth={1.6} className="text-[#7ab0c9]" />
@@ -463,14 +778,18 @@ export default function AdminCategoriesPage() {
               />
             </div>
             <div className="flex flex-col gap-1.5">
-              <label className="text-[0.65rem] font-bold tracking-[0.09em] uppercase text-[#a09a90]">
-                Description <span className="normal-case font-normal text-[#c8c2b8]">(optional)</span>
-              </label>
-              <input
-                className="w-full px-3 py-2 rounded-lg border border-[#e2ddd5] bg-[#faf9f6] text-[0.83rem] text-[#1a1714] placeholder:text-[#c8c2b8] focus:outline-none focus:border-[#c9a84c] focus:ring-2 focus:ring-[#c9a84c]/10 transition-all"
-                placeholder="Short description"
+              <div className="flex items-center justify-between">
+                <label className="text-[0.65rem] font-bold tracking-[0.09em] uppercase text-[#a09a90]">
+                  Description <span className="normal-case font-normal text-[#c8c2b8]">(optional)</span>
+                </label>
+                <span className="text-[0.6rem] text-[#c8c2b8] italic">Full editor available after creation</span>
+              </div>
+              <textarea
+                className="w-full px-3 py-2 rounded-lg border border-[#e2ddd5] bg-[#faf9f6] text-[0.83rem] text-[#1a1714] placeholder:text-[#c8c2b8] focus:outline-none focus:border-[#c9a84c] focus:ring-2 focus:ring-[#c9a84c]/10 transition-all resize-none"
+                placeholder="Short description (you can add rich content after creating)"
                 value={catDesc}
                 onChange={e => setCatDesc(e.target.value)}
+                rows={2}
               />
             </div>
             <button
@@ -515,15 +834,11 @@ export default function AdminCategoriesPage() {
                 {categories.map(c => <option key={c._id} value={c._id}>{c.name}</option>)}
               </select>
             </div>
-
-            {/* ── Image picker ── */}
             <div className="flex flex-col gap-1.5">
               <label className="text-[0.65rem] font-bold tracking-[0.09em] uppercase text-[#a09a90]">
                 Image <span className="normal-case font-normal text-[#c8c2b8]">(optional)</span>
               </label>
-
               {subPreview ? (
-                /* preview with remove button */
                 <div className="relative rounded-xl overflow-hidden border border-[#e2ddd5]">
                   <img src={subPreview} alt="preview" className="w-full h-32 object-cover" />
                   <button
@@ -535,7 +850,6 @@ export default function AdminCategoriesPage() {
                   </button>
                 </div>
               ) : (
-                /* dashed drop-zone */
                 <label
                   htmlFor="sub-image-input"
                   className="flex flex-col items-center justify-center gap-2 w-full h-24 rounded-xl border-2 border-dashed border-[#e2ddd5] bg-[#faf9f6] cursor-pointer hover:border-[#7ab0c9]/60 hover:bg-[#f0f7fb] transition-all"
@@ -553,7 +867,6 @@ export default function AdminCategoriesPage() {
                 onChange={e => handleSubImagePick(e.target.files?.[0] ?? null)}
               />
             </div>
-
             <button
               type="submit" disabled={loading || categories.length === 0}
               className="flex items-center justify-center gap-2 w-full py-2.5 rounded-xl bg-[#1a1714] text-white text-[0.8rem] font-semibold tracking-wide hover:bg-[#2a2420] disabled:opacity-50 transition-all"
@@ -564,11 +877,20 @@ export default function AdminCategoriesPage() {
         </div>
       </div>
 
-      {/* ══ Modal — upload / replace image on existing subcategory ══ */}
+      {/* ══ Edit Category Modal ══ */}
+      {editingCat && (
+        <EditCategoryModal
+          category={editingCat}
+          onClose={() => setEditingCat(null)}
+          onSave={saveCategory}
+          loading={editLoading}
+        />
+      )}
+
+      {/* ══ Upload Image Modal ══ */}
       {uploadingSub && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: 'rgba(26,23,20,0.55)', backdropFilter: 'blur(4px)' }}>
           <div className="bg-white rounded-2xl shadow-2xl border border-[#ede9e1] w-full max-w-sm p-6 flex flex-col gap-5">
-            {/* header */}
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
                 <div className="w-9 h-9 rounded-xl bg-[#7ab0c9]/10 border border-[#7ab0c9]/20 flex items-center justify-center">
@@ -583,15 +905,10 @@ export default function AdminCategoriesPage() {
                   </p>
                 </div>
               </div>
-              <button
-                onClick={closeUploadModal}
-                className="p-1.5 rounded-lg text-[#c8c2b8] hover:bg-[#f7f5f1] hover:text-[#6b6560] transition-all"
-              >
+              <button onClick={closeUploadModal} className="p-1.5 rounded-lg text-[#c8c2b8] hover:bg-[#f7f5f1] hover:text-[#6b6560] transition-all">
                 <X size={15} strokeWidth={2} />
               </button>
             </div>
-
-            {/* preview or drop-zone */}
             {uploadPreview ? (
               <div className="relative rounded-xl overflow-hidden border border-[#e2ddd5]">
                 <img src={uploadPreview} alt="preview" className="w-full h-44 object-cover" />
@@ -603,10 +920,7 @@ export default function AdminCategoriesPage() {
                 </button>
               </div>
             ) : (
-              <label
-                htmlFor="upload-existing-input"
-                className="flex flex-col items-center justify-center gap-2.5 w-full h-36 rounded-xl border-2 border-dashed border-[#e2ddd5] bg-[#faf9f6] cursor-pointer hover:border-[#7ab0c9]/60 hover:bg-[#f0f7fb] transition-all"
-              >
+              <label htmlFor="upload-existing-input" className="flex flex-col items-center justify-center gap-2.5 w-full h-36 rounded-xl border-2 border-dashed border-[#e2ddd5] bg-[#faf9f6] cursor-pointer hover:border-[#7ab0c9]/60 hover:bg-[#f0f7fb] transition-all">
                 <Upload size={20} strokeWidth={1.5} className="text-[#c8c2b8]" />
                 <div className="text-center">
                   <p className="text-[0.78rem] font-medium text-[#a09a90]">Click to choose image</p>
@@ -614,39 +928,18 @@ export default function AdminCategoriesPage() {
                 </div>
               </label>
             )}
-            <input
-              id="upload-existing-input"
-              ref={uploadInputRef}
-              type="file"
-              accept="image/*"
-              className="hidden"
-              onChange={e => handleUploadFilePick(e.target.files?.[0] ?? null)}
-            />
-
-            {/* actions */}
+            <input id="upload-existing-input" ref={uploadInputRef} type="file" accept="image/*" className="hidden" onChange={e => handleUploadFilePick(e.target.files?.[0] ?? null)} />
             <div className="flex gap-2.5">
-              <button
-                onClick={closeUploadModal}
-                className="flex-1 py-2.5 rounded-xl border border-[#e2ddd5] text-[#6b6560] text-[0.8rem] font-semibold hover:bg-[#f7f5f1] transition-all"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={submitUploadImage}
-                disabled={!uploadFile || uploadLoading}
-                className="flex-1 py-2.5 rounded-xl bg-[#1a1714] text-white text-[0.8rem] font-semibold hover:bg-[#2a2420] disabled:opacity-50 transition-all flex items-center justify-center gap-2"
-              >
-                {uploadLoading
-                  ? <><span className="w-3.5 h-3.5 rounded-full border-2 border-white/30 border-t-white animate-spin" /> Uploading…</>
-                  : <><Upload size={13} strokeWidth={2} /> Upload</>
-                }
+              <button onClick={closeUploadModal} className="flex-1 py-2.5 rounded-xl border border-[#e2ddd5] text-[#6b6560] text-[0.8rem] font-semibold hover:bg-[#f7f5f1] transition-all">Cancel</button>
+              <button onClick={submitUploadImage} disabled={!uploadFile || uploadLoading} className="flex-1 py-2.5 rounded-xl bg-[#1a1714] text-white text-[0.8rem] font-semibold hover:bg-[#2a2420] disabled:opacity-50 transition-all flex items-center justify-center gap-2">
+                {uploadLoading ? <><span className="w-3.5 h-3.5 rounded-full border-2 border-white/30 border-t-white animate-spin" /> Uploading…</> : <><Upload size={13} strokeWidth={2} /> Upload</>}
               </button>
             </div>
           </div>
         </div>
       )}
 
-      {/* ══ Delete Confirm Modal — Category ══ */}
+      {/* ══ Delete Category Modal ══ */}
       {deletingCat && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: 'rgba(26,23,20,0.55)', backdropFilter: 'blur(4px)' }}>
           <div className="bg-white rounded-2xl shadow-2xl border border-[#ede9e1] w-full max-w-sm p-6 flex flex-col gap-5">
@@ -670,7 +963,7 @@ export default function AdminCategoriesPage() {
         </div>
       )}
 
-      {/* ══ Delete Confirm Modal — Subcategory ══ */}
+      {/* ══ Delete Subcategory Modal ══ */}
       {deletingSub && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: 'rgba(26,23,20,0.55)', backdropFilter: 'blur(4px)' }}>
           <div className="bg-white rounded-2xl shadow-2xl border border-[#ede9e1] w-full max-w-sm p-6 flex flex-col gap-5">
