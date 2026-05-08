@@ -5,15 +5,23 @@ import { successResponse, errorResponse } from '@/lib/api-response';
 
 export async function GET(
   _req: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     await connectDB();
-    const product = await getProductById(params.id);
-    if (!product) return errorResponse('Product not found', 404);
+
+    const { id } = await params;
+
+    const product = await getProductById(id);
+
+    if (!product) {
+      return errorResponse('Product not found', 404);
+    }
+
     return successResponse(product);
   } catch (err) {
     console.error('[GET /api/products/[id]]', err);
+
     return errorResponse('Failed to fetch product', 500);
   }
 }

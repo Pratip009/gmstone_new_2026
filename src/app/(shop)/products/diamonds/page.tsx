@@ -1,12 +1,12 @@
-import { connectDB } from '@/lib/db';
-import { listProducts, getProductFacets } from '@/services/product.service';
-import { ProductFilterParams } from '@/services/productFilter.service';
-import ProductCard from '@/components/products/ProductCard';
-import FilterSidebar from '@/components/filters/FilterSidebar';
-import SortBar from '@/components/products/SortBar';
-import Pagination from '@/components/ui/Pagination';
-import MobileFilterDrawer from '@/components/filters/MobileFilterDrawer';
-
+import { connectDB } from "@/lib/db";
+import { listProducts, getProductFacets } from "@/services/product.service";
+import { ProductFilterParams } from "@/services/productFilter.service";
+import ProductCard from "@/components/products/ProductCard";
+import FilterSidebar from "@/components/filters/FilterSidebar";
+import SortBar from "@/components/products/SortBar";
+import Pagination from "@/components/ui/Pagination";
+import MobileFilterDrawer from "@/components/filters/MobileFilterDrawer";
+import { Suspense } from "react";
 interface PageProps {
   searchParams: Record<string, string>;
 }
@@ -15,21 +15,21 @@ export default async function DiamondsPage({ searchParams }: PageProps) {
   await connectDB();
 
   const params: ProductFilterParams = {
-    category:      searchParams.category ?? 'diamonds',  // always scope to diamonds
-    subcategory:   searchParams.subcategory,
-    shape:         searchParams.shape,
-    color:         searchParams.color,
-    clarity:       searchParams.clarity,
+    category: searchParams.category ?? "diamonds", // always scope to diamonds
+    subcategory: searchParams.subcategory,
+    shape: searchParams.shape,
+    color: searchParams.color,
+    clarity: searchParams.clarity,
     certification: searchParams.certification,
-    priceMin:      searchParams.priceMin,
-    priceMax:      searchParams.priceMax,
-    sizeMin:       searchParams.sizeMin,
-    sizeMax:       searchParams.sizeMax,
-    inStock:       searchParams.inStock,
-    q:             searchParams.q,
-    sortBy:        searchParams.sortBy as ProductFilterParams['sortBy'],
-    page:          searchParams.page || 1,
-    limit:         24,
+    priceMin: searchParams.priceMin,
+    priceMax: searchParams.priceMax,
+    sizeMin: searchParams.sizeMin,
+    sizeMax: searchParams.sizeMax,
+    inStock: searchParams.inStock,
+    q: searchParams.q,
+    sortBy: searchParams.sortBy as ProductFilterParams["sortBy"],
+    page: searchParams.page || 1,
+    limit: 24,
   };
 
   const [{ products, total, page, limit }, facets] = await Promise.all([
@@ -43,47 +43,77 @@ export default async function DiamondsPage({ searchParams }: PageProps) {
     <div className="min-h-screen bg-[#f7f6f3]">
       <div className="max-w-screen-2xl mx-auto px-4 sm:px-6 py-6 sm:py-10">
         <div className="flex gap-8 xl:gap-10">
-
           <aside className="hidden lg:block w-56 xl:w-60 shrink-0">
             <div className="sticky top-6">
-              <FilterSidebar productType="diamond" facets={facets} />
+              <Suspense fallback={<div>Loading filters...</div>}>
+                <FilterSidebar productType="watch" facets={facets} />
+              </Suspense>
             </div>
           </aside>
 
           <main className="flex-1 min-w-0">
-
             <div className="flex items-center gap-2 mb-3 lg:hidden">
-              <MobileFilterDrawer facets={facets} />
+              <Suspense fallback={null}>
+                <MobileFilterDrawer facets={facets} />
+              </Suspense>
             </div>
 
-            <SortBar total={total} currentSort={searchParams.sortBy} query={searchParams.q} />
+            <SortBar
+              total={total}
+              currentSort={searchParams.sortBy}
+              query={searchParams.q}
+            />
 
             {products.length === 0 ? (
               <div className="flex flex-col items-center justify-center py-24 sm:py-36 text-center">
                 <div className="w-12 h-12 sm:w-14 sm:h-14 border-[1.5px] border-[#0f0f0f] flex items-center justify-center mb-5 rounded-[2px]">
-                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" className="text-[#0f0f0f]/30">
-                    <circle cx="11" cy="11" r="8" stroke="currentColor" strokeWidth="1.5" />
-                    <path d="M21 21l-4.35-4.35" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+                  <svg
+                    width="18"
+                    height="18"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    className="text-[#0f0f0f]/30"
+                  >
+                    <circle
+                      cx="11"
+                      cy="11"
+                      r="8"
+                      stroke="currentColor"
+                      strokeWidth="1.5"
+                    />
+                    <path
+                      d="M21 21l-4.35-4.35"
+                      stroke="currentColor"
+                      strokeWidth="1.5"
+                      strokeLinecap="round"
+                    />
                   </svg>
                 </div>
-                <p className="font-serif text-sm font-medium text-[#0f0f0f] tracking-wide mb-1">No results found</p>
-                <p className="text-[11px] tracking-[0.1em] uppercase font-medium text-[#888]">Try adjusting your filters</p>
+                <p className="font-serif text-sm font-medium text-[#0f0f0f] tracking-wide mb-1">
+                  No results found
+                </p>
+                <p className="text-[11px] tracking-[0.1em] uppercase font-medium text-[#888]">
+                  Try adjusting your filters
+                </p>
               </div>
             ) : (
               <>
                 <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-2.5 sm:gap-3 mt-3">
                   {products.map((p: Record<string, unknown>) => {
                     const serialized = {
-                      _id:           String(p._id),
-                      name:          p.name          as string,
-                      price:         p.price         as number,
-                      shape:         p.shape         as string | string[] | undefined,
-                      size:          p.size          as number | undefined,
-                      color:         p.color         as string | string[] | undefined,
-                      clarity:       p.clarity       as string | string[] | undefined,
-                      certification: p.certification as string | string[] | undefined,
-                      images:        p.images        as string[],
-                      stock:         p.stock         as number,
+                      _id: String(p._id),
+                      name: p.name as string,
+                      price: p.price as number,
+                      shape: p.shape as string | string[] | undefined,
+                      size: p.size as number | undefined,
+                      color: p.color as string | string[] | undefined,
+                      clarity: p.clarity as string | string[] | undefined,
+                      certification: p.certification as
+                        | string
+                        | string[]
+                        | undefined,
+                      images: p.images as string[],
+                      stock: p.stock as number,
                     };
                     return (
                       <ProductCard
@@ -95,7 +125,11 @@ export default async function DiamondsPage({ searchParams }: PageProps) {
                   })}
                 </div>
                 <div className="mt-10 sm:mt-12">
-                  <Pagination page={page} totalPages={totalPages} searchParams={searchParams} />
+                  <Pagination
+                    page={page}
+                    totalPages={totalPages}
+                    searchParams={searchParams}
+                  />
                 </div>
               </>
             )}
