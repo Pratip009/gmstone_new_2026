@@ -12,6 +12,48 @@ interface PageProps {
   searchParams: Promise<Record<string, string>>;
 }
 
+// Watch-specific filter params — if any of these are present the page is in watch mode
+const WATCH_FILTER_PARAMS = [
+  "watchBrand","watchMovement","watchGender","watchStyle",
+  "watchStrapType","watchCaseMaterial","watchDialColor",
+  "watchFeatures","watchCaseSize",
+  // Also catch the attribute param names used by SearchBar chips
+  "brand","movement","strapType","caseMaterial","dialColor",
+  "feature","style","gender","caseSize",
+] as const;
+
+/**
+ * Determine whether the current page should show the Watch or Diamond view.
+ * Priority order:
+ *  1. Explicit category param ("watches" slug = watch, anything else = diamond)
+ *  2. Any watch-specific filter param present in the URL
+ *  3. Fallback: look at the first product's category
+ */
+function resolveProductType(
+  sp: Record<string, string>,
+  firstProduct: Record<string, unknown> | undefined,
+): "watch" | "diamond" {
+  // 1. Explicit category slug
+  if (sp.category) {
+    return sp.category === "watches" ? "watch" : "diamond";
+  }
+
+  // 2. Watch-specific filter param in URL
+  if (WATCH_FILTER_PARAMS.some((k) => sp[k])) {
+    return "watch";
+  }
+
+  // 3. Fallback to first product's category
+  const catSlug =
+    firstProduct &&
+    typeof firstProduct.category === "object" &&
+    firstProduct.category !== null
+      ? (firstProduct.category as { slug?: string }).slug
+      : firstProduct?.category;
+
+  return catSlug === "watches" ? "watch" : "diamond";
+}
+
 export default async function ProductsPage({ searchParams }: PageProps) {
   await connectDB();
 
@@ -28,17 +70,17 @@ export default async function ProductsPage({ searchParams }: PageProps) {
     priceMax:           sp.priceMax,
     sizeMin:            sp.sizeMin,
     sizeMax:            sp.sizeMax,
-    watchGender:        sp.watchGender,
-    watchBrand:         sp.watchBrand,
-    watchMovement:      sp.watchMovement,
-    watchStrapType:     sp.watchStrapType,
-    watchCaseMaterial:  sp.watchCaseMaterial,
-    watchDialColor:     sp.watchDialColor,
-    watchFeatures:      sp.watchFeatures,
-    watchStyle:         sp.watchStyle,
-    watchCaseSize:      sp.watchCaseSize,
+    watchGender:        sp.watchGender   ?? sp.gender,
+    watchBrand:         sp.watchBrand    ?? sp.brand,
+    watchMovement:      sp.watchMovement ?? sp.movement,
+    watchStrapType:     sp.watchStrapType  ?? sp.strapType,
+    watchCaseMaterial:  sp.watchCaseMaterial ?? sp.caseMaterial,
+    watchDialColor:     sp.watchDialColor  ?? sp.dialColor,
+    watchFeatures:      sp.watchFeatures  ?? sp.feature,
+    watchStyle:         sp.watchStyle     ?? sp.style,
+    watchCaseSize:      sp.watchCaseSize  ?? sp.caseSize,
     inStock:            sp.inStock,
-    q:                  sp.q,
+    q:                  sp.q ?? sp.search,   // support both ?q= and ?search=
     sortBy:             sp.sortBy as ProductFilterParams["sortBy"],
     page:               sp.page || 1,
     limit:              24,
@@ -51,20 +93,11 @@ export default async function ProductsPage({ searchParams }: PageProps) {
 
   const totalPages = Math.ceil(total / limit);
 
-  const productType: "watch" | "diamond" =
-    (products[0] as any)?.category?.slug === "watches" ? "watch" : "diamond";
+  // Robust product type resolution — URL params take priority over data
+  const productType = resolveProductType(sp, products[0] as Record<string, unknown> | undefined);
 
   return (
     <>
-      {/*
-        ── Load Poppins + Playfair Display from Google Fonts ──────────────────
-        Add this to your layout.tsx <head> instead if you prefer:
-          <link rel="preconnect" href="https://fonts.googleapis.com" />
-          <link
-            href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&family=Playfair+Display:ital,wght@0,400;0,600;1,400&display=swap"
-            rel="stylesheet"
-          />
-      */}
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&family=Playfair+Display:ital,wght@0,400;0,600;1,400&display=swap');
         body, .products-page * { font-family: 'Poppins', sans-serif !important; }
@@ -74,16 +107,15 @@ export default async function ProductsPage({ searchParams }: PageProps) {
         className="products-page min-h-screen bg-[#ffffff]"
         style={{ fontFamily: "'Poppins', sans-serif" }}
       >
-        {/* ── Top accent line ──────────────────────────────────────────────── */}
+        {/* ── Top accent line ── */}
         <div className="h-0.5 w-full bg-gradient-to-r from-transparent via-[#B8975A] to-transparent" />
 
         <div className="max-w-screen-2xl mx-auto px-4 sm:px-8 py-8 sm:py-12">
           <div className="flex gap-8 xl:gap-12">
 
-            {/* ── Sidebar: desktop ──────────────────────────────────────────── */}
+            {/* ── Sidebar: desktop ── */}
             <aside className="hidden lg:block w-56 xl:w-60 shrink-0">
               <div className="sticky top-8">
-                {/* Sidebar card */}
                 <div className="bg-white rounded-2xl border border-[#EDE3D0] shadow-[0_2px_20px_rgba(184,151,90,0.06)] px-5 py-6">
                   <Suspense fallback={<SidebarSkeleton />}>
                     <FilterSidebar productType={productType} facets={facets} />
@@ -92,7 +124,7 @@ export default async function ProductsPage({ searchParams }: PageProps) {
               </div>
             </aside>
 
-            {/* ── Main content ──────────────────────────────────────────────── */}
+            {/* ── Main content ── */}
             <main className="flex-1 min-w-0">
 
               {/* Mobile filter drawer trigger */}
@@ -121,7 +153,7 @@ export default async function ProductsPage({ searchParams }: PageProps) {
                 <SortBar
                   total={total}
                   currentSort={sp.sortBy}
-                  query={sp.q}
+                  query={sp.q ?? sp.search}
                 />
               </div>
 
@@ -136,24 +168,24 @@ export default async function ProductsPage({ searchParams }: PageProps) {
                   <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-4 sm:gap-5">
                     {products.map((p: Record<string, unknown>) => {
                       const serialized = {
-                        _id:              String(p._id),
-                        name:             p.name             as string,
-                        price:            p.price            as number,
-                        shape:            p.shape            as string | string[] | undefined,
-                        size:             p.size             as number | undefined,
-                        color:            p.color            as string | string[] | undefined,
-                        clarity:          p.clarity          as string | string[] | undefined,
-                        certification:    p.certification    as string | string[] | undefined,
-                        watchBrand:       p.watchBrand       as string | undefined,
-                        watchMovement:    p.watchMovement    as string | undefined,
-                        watchGender:      p.watchGender      as string | undefined,
-                        watchStyle:       p.watchStyle       as string | undefined,
-                        watchCaseMaterial:p.watchCaseMaterial as string | undefined,
-                        watchDialColor:   p.watchDialColor   as string | undefined,
-                        watchStrapType:   p.watchStrapType   as string | undefined,
-                        watchCaseSize:    p.watchCaseSize    as string | undefined,
-                        images:           p.images           as string[],
-                        stock:            p.stock            as number,
+                        _id:               String(p._id),
+                        name:              p.name              as string,
+                        price:             p.price             as number,
+                        shape:             p.shape             as string | string[] | undefined,
+                        size:              p.size              as number | undefined,
+                        color:             p.color             as string | string[] | undefined,
+                        clarity:           p.clarity           as string | string[] | undefined,
+                        certification:     p.certification     as string | string[] | undefined,
+                        watchBrand:        p.watchBrand        as string | undefined,
+                        watchMovement:     p.watchMovement     as string | undefined,
+                        watchGender:       p.watchGender       as string | undefined,
+                        watchStyle:        p.watchStyle        as string | undefined,
+                        watchCaseMaterial: p.watchCaseMaterial as string | undefined,
+                        watchDialColor:    p.watchDialColor    as string | undefined,
+                        watchStrapType:    p.watchStrapType    as string | undefined,
+                        watchCaseSize:     p.watchCaseSize     as string | undefined,
+                        images:            p.images            as string[],
+                        stock:             p.stock             as number,
                       };
                       return (
                         <ProductCard
@@ -174,7 +206,7 @@ export default async function ProductsPage({ searchParams }: PageProps) {
           </div>
         </div>
 
-        {/* ── Bottom accent line ───────────────────────────────────────────── */}
+        {/* ── Bottom accent line ── */}
         <div className="h-px w-full bg-[#EDE3D0] mt-12" />
         <div className="max-w-screen-2xl mx-auto px-8 py-6 flex items-center justify-between">
           <div className="flex items-center gap-2">
@@ -198,36 +230,46 @@ export default async function ProductsPage({ searchParams }: PageProps) {
 // ─── Active filter chips ──────────────────────────────────────────────────────
 function ActiveFilterChips({ searchParams }: { searchParams: Record<string, string> }) {
   const chipKeys = [
-    'shape', 'color', 'clarity', 'watchBrand', 'watchMovement',
-    'watchGender', 'watchStyle', 'watchStrapType', 'watchCaseMaterial',
-    'watchDialColor', 'watchFeatures', 'watchCaseSize', 'inStock',
+    "shape","color","clarity",
+    "watchBrand","brand",
+    "watchMovement","movement",
+    "watchGender","gender",
+    "watchStyle","style",
+    "watchStrapType","strapType",
+    "watchCaseMaterial","caseMaterial",
+    "watchDialColor","dialColor",
+    "watchFeatures","feature",
+    "watchCaseSize","caseSize",
+    "inStock",
   ];
 
+  // De-dupe: prefer the watch-prefixed key if both are present
+  const seen = new Set<string>();
   const chips: { key: string; label: string }[] = [];
 
   chipKeys.forEach((key) => {
     const val = searchParams[key];
     if (!val) return;
-    val.split(',').filter(Boolean).forEach((v) => {
-      chips.push({
-        key,
-        label: key === 'inStock' ? 'In Stock' : v,
-      });
+    val.split(",").filter(Boolean).forEach((v) => {
+      const dedupeKey = `${v.toLowerCase()}`;
+      if (seen.has(dedupeKey)) return;
+      seen.add(dedupeKey);
+      chips.push({ key, label: key === "inStock" ? "In Stock" : v });
     });
   });
 
   if (searchParams.priceMin || searchParams.priceMax) {
-    const min = searchParams.priceMin ? `$${Number(searchParams.priceMin).toLocaleString()}` : '';
-    const max = searchParams.priceMax ? `$${Number(searchParams.priceMax).toLocaleString()}` : '';
-    chips.push({ key: 'price', label: min && max ? `${min} – ${max}` : min || `Under ${max}` });
+    const min = searchParams.priceMin ? `$${Number(searchParams.priceMin).toLocaleString()}` : "";
+    const max = searchParams.priceMax ? `$${Number(searchParams.priceMax).toLocaleString()}` : "";
+    chips.push({ key: "price", label: min && max ? `${min} – ${max}` : min || `Under ${max}` });
   }
 
   if (searchParams.sizeMin || searchParams.sizeMax) {
     const label = [
       searchParams.sizeMin && `${searchParams.sizeMin}ct`,
       searchParams.sizeMax && `${searchParams.sizeMax}ct`,
-    ].filter(Boolean).join(' – ');
-    chips.push({ key: 'size', label });
+    ].filter(Boolean).join(" – ");
+    chips.push({ key: "size", label });
   }
 
   if (chips.length === 0) return null;
@@ -251,17 +293,15 @@ function ActiveFilterChips({ searchParams }: { searchParams: Record<string, stri
 function EmptyState() {
   return (
     <div className="flex flex-col items-center justify-center py-28 sm:py-40 text-center">
-      {/* Diamond outline icon */}
       <div className="mb-6 relative">
         <div className="w-16 h-16 border border-[#EDE3D0] rounded-2xl flex items-center justify-center bg-white shadow-[0_2px_16px_rgba(184,151,90,0.06)]">
           <svg width="24" height="24" viewBox="0 0 24 24" fill="none" className="text-[#D4C4A0]">
-            <path d="M12 22L3 10l2.5-6h13L21 10z" stroke="currentColor" strokeWidth="1.2" strokeLinejoin="round" />
-            <path d="M3 10h18M12 22L8 10l4-6 4 6z" stroke="currentColor" strokeWidth="1" strokeLinejoin="round" />
+            <path d="M12 22L3 10l2.5-6h13L21 10z" stroke="currentColor" strokeWidth="1.2" strokeLinejoin="round"/>
+            <path d="M3 10h18M12 22L8 10l4-6 4 6z" stroke="currentColor" strokeWidth="1" strokeLinejoin="round"/>
           </svg>
         </div>
         <div className="absolute -bottom-1 -right-1 w-4 h-4 bg-[#B8975A] rotate-45 rounded-[2px] opacity-60" />
       </div>
-
       <p
         className="text-lg font-normal text-[#1A1612] mb-2"
         style={{ fontFamily: "'Playfair Display', serif" }}
