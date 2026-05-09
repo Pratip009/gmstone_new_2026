@@ -43,7 +43,7 @@ export default async function DiamondsPage({ searchParams }: PageProps) {
   const totalPages = Math.ceil(total / limit);
 
   return (
-    <div className="min-h-screen bg-[#f7f6f3]">
+    <div className="min-h-screen bg-[#ffffff]">
       <div className="max-w-screen-2xl mx-auto px-4 sm:px-6 py-6 sm:py-10">
         <div className="flex gap-8 xl:gap-10">
           <aside className="hidden lg:block w-56 xl:w-60 shrink-0">

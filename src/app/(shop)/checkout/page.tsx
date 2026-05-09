@@ -17,16 +17,16 @@ interface ShippingForm {
 
 const EMPTY_FORM: ShippingForm = {
   fullName: '', addressLine1: '', addressLine2: '',
-  city: '', state: '', postalCode: '', country: 'US', phone: '',
+  city: '', state: '', postalCode: '', country: 'IN', phone: '',
 };
 
 // ── Country list ──────────────────────────────────────────────────────────────
 const COUNTRIES = [
+  { code: 'IN', name: 'India' },
   { code: 'US', name: 'United States' },
   { code: 'CA', name: 'Canada' },
   { code: 'GB', name: 'United Kingdom' },
   { code: 'AU', name: 'Australia' },
-  { code: 'IN', name: 'India' },
   { code: 'DE', name: 'Germany' },
   { code: 'FR', name: 'France' },
   { code: 'JP', name: 'Japan' },
@@ -77,6 +77,17 @@ const CA_PROVINCES = [
   ['SK','Saskatchewan'],['YT','Yukon'],
 ];
 
+// ── Indian states ─────────────────────────────────────────────────────────────
+const IN_STATES = [
+  'Andhra Pradesh','Arunachal Pradesh','Assam','Bihar','Chhattisgarh',
+  'Goa','Gujarat','Haryana','Himachal Pradesh','Jharkhand','Karnataka',
+  'Kerala','Madhya Pradesh','Maharashtra','Manipur','Meghalaya','Mizoram',
+  'Nagaland','Odisha','Punjab','Rajasthan','Sikkim','Tamil Nadu','Telangana',
+  'Tripura','Uttar Pradesh','Uttarakhand','West Bengal',
+  'Andaman and Nicobar Islands','Chandigarh','Dadra and Nagar Haveli and Daman and Diu',
+  'Delhi','Jammu and Kashmir','Ladakh','Lakshadweep','Puducherry',
+];
+
 // ── Postal-code pattern per country ──────────────────────────────────────────
 const POSTAL_PATTERNS: Record<string, { pattern: RegExp; hint: string }> = {
   US: { pattern: /^\d{5}(-\d{4})?$/, hint: '12345 or 12345-6789' },
@@ -86,13 +97,12 @@ const POSTAL_PATTERNS: Record<string, { pattern: RegExp; hint: string }> = {
   IN: { pattern: /^\d{6}$/, hint: '110001' },
 };
 
-// ── Validation helpers ────────────────────────────────────────────────────────
+// ── Validation ────────────────────────────────────────────────────────────────
 type FormErrors = Partial<Record<keyof ShippingForm, string>>;
 
 function validateForm(form: ShippingForm): FormErrors {
   const errors: FormErrors = {};
 
-  // Full name: at least two words, letters/spaces/hyphens only
   if (!form.fullName.trim()) {
     errors.fullName = 'Full name is required.';
   } else if (!/^[A-Za-z\u00C0-\u024F\s'\-]{2,}$/.test(form.fullName.trim())) {
@@ -101,28 +111,22 @@ function validateForm(form: ShippingForm): FormErrors {
     errors.fullName = 'Please enter your first and last name.';
   }
 
-  // Address line 1
   if (!form.addressLine1.trim()) {
     errors.addressLine1 = 'Street address is required.';
   } else if (form.addressLine1.trim().length < 5) {
     errors.addressLine1 = 'Enter a complete street address.';
-  } else if (!/\d/.test(form.addressLine1)) {
-    errors.addressLine1 = 'Address should include a street number.';
   }
 
-  // City
   if (!form.city.trim()) {
     errors.city = 'City is required.';
   } else if (!/^[A-Za-z\u00C0-\u024F\s'\-\.]{2,}$/.test(form.city.trim())) {
     errors.city = 'Enter a valid city name.';
   }
 
-  // State (required for US and CA)
-  if ((form.country === 'US' || form.country === 'CA') && !form.state) {
-    errors.state = form.country === 'US' ? 'State is required.' : 'Province is required.';
+  if ((form.country === 'US' || form.country === 'CA' || form.country === 'IN') && !form.state) {
+    errors.state = form.country === 'CA' ? 'Province is required.' : 'State is required.';
   }
 
-  // Postal code
   if (!form.postalCode.trim()) {
     errors.postalCode = 'Postal code is required.';
   } else {
@@ -132,13 +136,13 @@ function validateForm(form: ShippingForm): FormErrors {
     }
   }
 
-  // Country
   if (!form.country) {
     errors.country = 'Please select a country.';
   }
 
-  // Phone (optional, but if provided must be valid)
-  if (form.phone.trim()) {
+  if (!form.phone.trim()) {
+    errors.phone = 'Phone number is required.';
+  } else {
     const digits = form.phone.replace(/\D/g, '');
     if (digits.length < 7 || digits.length > 15) {
       errors.phone = 'Enter a valid phone number (7–15 digits).';
@@ -149,27 +153,16 @@ function validateForm(form: ShippingForm): FormErrors {
 }
 
 // ── Phone formatter ───────────────────────────────────────────────────────────
-function formatPhone(raw: string): string {
+function formatPhone(raw: string, country: string): string {
   const digits = raw.replace(/\D/g, '').slice(0, 15);
+  if (country === 'IN') {
+    if (digits.length <= 5) return digits;
+    return `${digits.slice(0, 5)} ${digits.slice(5)}`;
+  }
   if (digits.length <= 3) return digits;
   if (digits.length <= 6) return `(${digits.slice(0, 3)}) ${digits.slice(3)}`;
   if (digits.length <= 10) return `(${digits.slice(0, 3)}) ${digits.slice(3, 6)}-${digits.slice(6)}`;
   return `+${digits.slice(0, digits.length - 10)} (${digits.slice(-10, -7)}) ${digits.slice(-7, -4)}-${digits.slice(-4)}`;
-}
-
-// ── Postal-code formatter ─────────────────────────────────────────────────────
-function formatPostal(value: string, country: string): string {
-  if (country === 'US') {
-    const d = value.replace(/\D/g, '').slice(0, 9);
-    if (d.length > 5) return `${d.slice(0, 5)}-${d.slice(5)}`;
-    return d;
-  }
-  if (country === 'CA') {
-    const clean = value.replace(/[^A-Za-z0-9]/g, '').toUpperCase().slice(0, 6);
-    if (clean.length > 3) return `${clean.slice(0, 3)} ${clean.slice(3)}`;
-    return clean;
-  }
-  return value.toUpperCase().slice(0, 10);
 }
 
 // ── Field label map ───────────────────────────────────────────────────────────
@@ -177,15 +170,14 @@ const LABELS: Record<keyof ShippingForm, string> = {
   fullName: 'Full Name',
   addressLine1: 'Street Address',
   addressLine2: 'Apt / Suite / Unit',
-  city: 'City',
+  city: 'City / District',
   state: 'State / Province',
-  postalCode: 'Postal Code',
+  postalCode: 'Pincode / Postal Code',
   country: 'Country',
   phone: 'Phone Number',
 };
 
 // ── Sub-components ─────────────────────────────────────────────────────────────
-
 function FieldError({ msg }: { msg?: string }) {
   if (!msg) return null;
   return (
@@ -209,6 +201,34 @@ function FieldSuccess({ show }: { show: boolean }) {
   );
 }
 
+// ── Pincode lookup result banner ──────────────────────────────────────────────
+function PincodeBanner({ postOffices, onSelect }: {
+  postOffices: { Name: string; District: string; State: string }[];
+  onSelect: (po: { Name: string; District: string; State: string }) => void;
+}) {
+  if (!postOffices.length) return null;
+  return (
+    <div className="mt-2 rounded-lg border border-amber-200 bg-amber-50 p-3">
+      <p className="text-xs font-semibold text-amber-700 mb-2">
+        📍 {postOffices.length} area{postOffices.length > 1 ? 's' : ''} found — select yours:
+      </p>
+      <div className="flex flex-col gap-1 max-h-40 overflow-y-auto">
+        {postOffices.map((po, i) => (
+          <button
+            key={i}
+            type="button"
+            onClick={() => onSelect(po)}
+            className="text-left px-3 py-2 rounded-md text-xs bg-white border border-amber-200 hover:border-amber-400 hover:bg-amber-50 transition-colors"
+          >
+            <span className="font-semibold text-gray-800">{po.Name}</span>
+            <span className="text-gray-500 ml-2">{po.District}, {po.State}</span>
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 // ── Main component ─────────────────────────────────────────────────────────────
 export default function CheckoutPage() {
   const { apiFetch } = useApi();
@@ -222,13 +242,19 @@ export default function CheckoutPage() {
   const [loading, setLoading] = useState(false);
   const [total, setTotal] = useState(0);
 
+  // ── Pincode lookup state ──────────────────────────────────────────────────
+  const [pinLoading, setPinLoading] = useState(false);
+  const [pinError, setPinError] = useState('');
+  const [postOffices, setPostOffices] = useState<{ Name: string; District: string; State: string }[]>([]);
+  const [pinVerified, setPinVerified] = useState(false);
+
   useEffect(() => {
     apiFetch('/api/cart')
       .then((d) => setTotal(d.data.totals?.total || 0))
       .catch(() => router.push('/login'));
   }, []);
 
-  // Re-validate on form change (only for touched fields)
+  // Re-validate on form change
   useEffect(() => {
     const newErrors = validateForm(form);
     setErrors((prev) => {
@@ -236,7 +262,6 @@ export default function CheckoutPage() {
       (Object.keys(newErrors) as (keyof ShippingForm)[]).forEach((k) => {
         if (touched[k]) updated[k] = newErrors[k];
       });
-      // Clear errors for fields that are now valid and were touched
       (Object.keys(touched) as (keyof ShippingForm)[]).forEach((k) => {
         if (!newErrors[k]) delete updated[k];
       });
@@ -244,10 +269,13 @@ export default function CheckoutPage() {
     });
   }, [form, touched]);
 
-  // When country changes, reset state and postal code
+  // Reset pincode state when country changes
   const handleCountryChange = (country: string) => {
-    setForm((f) => ({ ...f, country, state: '', postalCode: '' }));
+    setForm((f) => ({ ...f, country, state: '', postalCode: '', city: '' }));
     setTouched((t) => ({ ...t, country: true }));
+    setPostOffices([]);
+    setPinError('');
+    setPinVerified(false);
   };
 
   const handleBlur = (field: keyof ShippingForm) => {
@@ -258,29 +286,103 @@ export default function CheckoutPage() {
 
   const handleChange = (field: keyof ShippingForm, value: string) => {
     let processed = value;
-    if (field === 'phone') processed = value; // raw input; formatter runs on display
-    if (field === 'postalCode') processed = formatPostal(value, form.country);
-    if (field === 'fullName' || field === 'city') {
-      // Prevent numbers / special chars being typed
+    if (field === 'fullName') {
       processed = value.replace(/[^A-Za-z\u00C0-\u024F\s'\-\.]/g, '');
     }
     setForm((f) => ({ ...f, [field]: processed }));
   };
 
   const handlePhoneChange = (raw: string) => {
-    // Store digits only, display formatted
     const digits = raw.replace(/\D/g, '').slice(0, 15);
     setForm((f) => ({ ...f, phone: digits }));
   };
 
+  // ── India pincode auto-lookup ─────────────────────────────────────────────
+  const handlePincodeChange = async (value: string) => {
+    const digits = value.replace(/\D/g, '').slice(0, 6);
+    setForm((f) => ({ ...f, postalCode: digits, city: '', state: '' }));
+    setPostOffices([]);
+    setPinError('');
+    setPinVerified(false);
+
+    if (digits.length === 6) {
+      setPinLoading(true);
+      try {
+        const res = await fetch(`https://api.postalpincode.in/pincode/${digits}`);
+        const data = await res.json();
+
+        if (data[0].Status === 'Success' && data[0].PostOffice?.length > 0) {
+          const offices = data[0].PostOffice as { Name: string; District: string; State: string }[];
+          if (offices.length === 1) {
+            // Auto-fill if only one result
+            setForm((f) => ({
+              ...f,
+              postalCode: digits,
+              city: offices[0].District,
+              state: offices[0].State,
+              country: 'IN',
+            }));
+            setTouched((t) => ({ ...t, postalCode: true, city: true, state: true }));
+            setPinVerified(true);
+          } else {
+            // Show selection list
+            setPostOffices(offices);
+          }
+        } else {
+          setPinError('Invalid pincode. Please check and try again.');
+        }
+      } catch {
+        setPinError('Could not verify pincode. Please fill city and state manually.');
+      } finally {
+        setPinLoading(false);
+      }
+    }
+  };
+
+  const handlePostOfficeSelect = (po: { Name: string; District: string; State: string }) => {
+    setForm((f) => ({
+      ...f,
+      city: po.District,
+      state: po.State,
+      country: 'IN',
+    }));
+    setTouched((t) => ({ ...t, city: true, state: true, postalCode: true }));
+    setPostOffices([]);
+    setPinVerified(true);
+  };
+
+  // ── Generic postal code handler for non-India countries ──────────────────
+  const handlePostalChange = (value: string) => {
+    if (form.country === 'IN') {
+      handlePincodeChange(value);
+      return;
+    }
+    let processed = value;
+    if (form.country === 'US') {
+      const d = value.replace(/\D/g, '').slice(0, 9);
+      processed = d.length > 5 ? `${d.slice(0, 5)}-${d.slice(5)}` : d;
+    } else if (form.country === 'CA') {
+      const clean = value.replace(/[^A-Za-z0-9]/g, '').toUpperCase().slice(0, 6);
+      processed = clean.length > 3 ? `${clean.slice(0, 3)} ${clean.slice(3)}` : clean;
+    } else {
+      processed = value.toUpperCase().slice(0, 10);
+    }
+    setForm((f) => ({ ...f, postalCode: processed }));
+  };
+
   const handleShippingSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    // Mark all fields touched
     const allTouched = Object.keys(EMPTY_FORM).reduce(
       (acc, k) => ({ ...acc, [k]: true }),
       {} as Record<keyof ShippingForm, boolean>
     );
     setTouched(allTouched);
+
+    // Extra check: India pincode must be verified
+    if (form.country === 'IN' && !pinVerified && postOffices.length === 0) {
+      setPinError('Please enter a valid 6-digit pincode to auto-fill your location.');
+      return;
+    }
 
     const newErrors = validateForm(form);
     setErrors(newErrors);
@@ -322,8 +424,8 @@ export default function CheckoutPage() {
     }
   };
 
-  // Determine whether to show a state/province dropdown
-  const showStateDropdown = form.country === 'US' || form.country === 'CA';
+  const isIndia = form.country === 'IN';
+  const showUSCADropdown = form.country === 'US' || form.country === 'CA';
   const stateOptions = form.country === 'US' ? US_STATES : CA_PROVINCES;
   const stateLabel = form.country === 'CA' ? 'Province' : 'State';
 
@@ -333,11 +435,11 @@ export default function CheckoutPage() {
   const inputNormal = `${inputBase} border-gray-300 focus:border-amber-500 focus:ring-2 focus:ring-amber-100`;
   const inputError = `${inputBase} border-red-400 focus:border-red-500 focus:ring-2 focus:ring-red-100 bg-red-50`;
   const inputValid = `${inputBase} border-emerald-400 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100`;
+  const inputLocked = `${inputBase} border-emerald-300 bg-emerald-50 text-gray-700 cursor-default`;
 
   const getInputClass = (field: keyof ShippingForm) => {
     if (errors[field]) return inputError;
-    if (touched[field] && !errors[field] && (form[field] || field === 'addressLine2' || field === 'phone'))
-      return inputValid;
+    if (touched[field] && !errors[field] && form[field]) return inputValid;
     return inputNormal;
   };
 
@@ -372,7 +474,7 @@ export default function CheckoutPage() {
             <div className="relative">
               <input
                 className={getInputClass('fullName')}
-                placeholder="Jane Smith"
+                placeholder="Rahul Sharma"
                 value={form.fullName}
                 onChange={(e) => handleChange('fullName', e.target.value)}
                 onBlur={() => handleBlur('fullName')}
@@ -409,6 +511,83 @@ export default function CheckoutPage() {
             <FieldError msg={errors.country} />
           </div>
 
+          {/* ── INDIA: Pincode first ── */}
+          {isIndia && (
+            <div>
+              <label className="block text-xs font-medium text-gray-600 mb-1">
+                Pincode <span className="text-red-500">*</span>
+                <span className="text-gray-400 ml-1 text-xs">(city & state auto-filled)</span>
+              </label>
+              <div className="relative">
+                <input
+                  className={pinError ? inputError : pinVerified ? inputValid : getInputClass('postalCode')}
+                  placeholder="Enter 6-digit pincode"
+                  value={form.postalCode}
+                  onChange={(e) => handlePincodeChange(e.target.value)}
+                  onBlur={() => handleBlur('postalCode')}
+                  autoComplete="postal-code"
+                  maxLength={6}
+                  inputMode="numeric"
+                />
+                {pinLoading && (
+                  <div className="absolute right-3 top-1/2 -translate-y-1/2">
+                    <svg className="w-4 h-4 text-amber-500 animate-spin" viewBox="0 0 24 24" fill="none">
+                      <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="2.5" opacity="0.3"/>
+                      <path d="M12 2a10 10 0 0110 10" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"/>
+                    </svg>
+                  </div>
+                )}
+                {pinVerified && !pinLoading && (
+                  <span className="absolute right-3 top-1/2 -translate-y-1/2 text-emerald-400">
+                    <svg className="w-4 h-4" viewBox="0 0 16 16" fill="currentColor">
+                      <path d="M13.485 1.929a1 1 0 010 1.414L6.343 10.485a1 1 0 01-1.414 0L1.515 7.07a1 1 0 011.414-1.414L5.636 8.364l6.435-6.435a1 1 0 011.414 0z"/>
+                    </svg>
+                  </span>
+                )}
+              </div>
+              {pinError && (
+                <p className="mt-1 text-xs text-red-400 flex items-center gap-1">
+                  <svg className="w-3 h-3 flex-shrink-0" viewBox="0 0 12 12" fill="currentColor">
+                    <path d="M6 0a6 6 0 100 12A6 6 0 006 0zm.75 9H5.25V7.5h1.5V9zm0-3H5.25V3h1.5v3z"/>
+                  </svg>
+                  {pinError}
+                </p>
+              )}
+              <FieldError msg={errors.postalCode} />
+
+              {/* Post office selector */}
+              <PincodeBanner postOffices={postOffices} onSelect={handlePostOfficeSelect} />
+
+              {/* Auto-filled location preview */}
+              {pinVerified && form.city && form.state && (
+                <div className="mt-2 flex items-center gap-2 px-3 py-2 rounded-lg bg-emerald-50 border border-emerald-200">
+                  <svg className="w-4 h-4 text-emerald-500 flex-shrink-0" viewBox="0 0 24 24" fill="none">
+                    <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z"
+                      fill="currentColor" opacity="0.2"/>
+                    <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z"
+                      stroke="#059669" strokeWidth="1.5"/>
+                    <circle cx="12" cy="9" r="2.5" fill="#059669"/>
+                  </svg>
+                  <span className="text-xs text-emerald-700 font-medium">
+                    {form.city}, {form.state}, India
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setForm((f) => ({ ...f, postalCode: '', city: '', state: '' }));
+                      setPinVerified(false);
+                      setPostOffices([]);
+                      setPinError('');
+                    }}
+                    className="ml-auto text-xs text-emerald-600 underline hover:text-emerald-800"
+                  >
+                    Change
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
+
           {/* Address Line 1 */}
           <div>
             <label className="block text-xs font-medium text-gray-600 mb-1">
@@ -417,7 +596,7 @@ export default function CheckoutPage() {
             <div className="relative">
               <input
                 className={getInputClass('addressLine1')}
-                placeholder="123 Main Street"
+                placeholder={isIndia ? "House No., Street, Area" : "123 Main Street"}
                 value={form.addressLine1}
                 onChange={(e) => handleChange('addressLine1', e.target.value)}
                 onBlur={() => handleBlur('addressLine1')}
@@ -436,7 +615,7 @@ export default function CheckoutPage() {
             </label>
             <input
               className={inputNormal}
-              placeholder="Apt 4B, Floor 2, etc."
+              placeholder={isIndia ? "Landmark, Colony, etc." : "Apt 4B, Floor 2, etc."}
               value={form.addressLine2}
               onChange={(e) => setForm((f) => ({ ...f, addressLine2: e.target.value }))}
               autoComplete="address-line2"
@@ -445,30 +624,83 @@ export default function CheckoutPage() {
 
           {/* City + State row */}
           <div className="grid grid-cols-2 gap-3">
+            {/* City */}
             <div>
               <label className="block text-xs font-medium text-gray-600 mb-1">
-                {LABELS.city} <span className="text-red-500">*</span>
+                {isIndia ? 'District / City' : LABELS.city} <span className="text-red-500">*</span>
               </label>
               <div className="relative">
                 <input
-                  className={getInputClass('city')}
-                  placeholder="New York"
+                  className={isIndia && pinVerified ? inputLocked : getInputClass('city')}
+                  placeholder={isIndia ? "Auto-filled" : "New York"}
                   value={form.city}
-                  onChange={(e) => handleChange('city', e.target.value)}
+                  onChange={(e) => !pinVerified && handleChange('city', e.target.value)}
                   onBlur={() => handleBlur('city')}
                   autoComplete="address-level2"
+                  readOnly={isIndia && pinVerified}
                 />
-                <FieldSuccess show={!!(touched.city && !errors.city && form.city)} />
+                {(!isIndia || !pinVerified) && (
+                  <FieldSuccess show={!!(touched.city && !errors.city && form.city)} />
+                )}
+                {isIndia && pinVerified && (
+                  <span className="absolute right-3 top-1/2 -translate-y-1/2 text-emerald-400">
+                    <svg className="w-4 h-4" viewBox="0 0 16 16" fill="currentColor">
+                      <path d="M13.485 1.929a1 1 0 010 1.414L6.343 10.485a1 1 0 01-1.414 0L1.515 7.07a1 1 0 011.414-1.414L5.636 8.364l6.435-6.435a1 1 0 011.414 0z"/>
+                    </svg>
+                  </span>
+                )}
               </div>
               <FieldError msg={errors.city} />
             </div>
 
+            {/* State */}
             <div>
               <label className="block text-xs font-medium text-gray-600 mb-1">
-                {showStateDropdown ? stateLabel : LABELS.state}
-                {showStateDropdown && <span className="text-red-500"> *</span>}
+                {isIndia ? 'State' : showUSCADropdown ? stateLabel : LABELS.state}
+                <span className="text-red-500"> *</span>
               </label>
-              {showStateDropdown ? (
+
+              {/* India: locked text input after pincode verify, else dropdown */}
+              {isIndia ? (
+                <div className="relative">
+                  {pinVerified ? (
+                    <input
+                      className={inputLocked}
+                      value={form.state}
+                      readOnly
+                    />
+                  ) : (
+                    <select
+                      className={`${getInputClass('state')} appearance-none pr-8 cursor-pointer`}
+                      value={form.state}
+                      onChange={(e) => {
+                        setForm((f) => ({ ...f, state: e.target.value }));
+                        setTouched((t) => ({ ...t, state: true }));
+                      }}
+                      onBlur={() => handleBlur('state')}
+                    >
+                      <option value="">Select state…</option>
+                      {IN_STATES.map((s) => (
+                        <option key={s} value={s}>{s}</option>
+                      ))}
+                    </select>
+                  )}
+                  {pinVerified && (
+                    <span className="absolute right-3 top-1/2 -translate-y-1/2 text-emerald-400">
+                      <svg className="w-4 h-4" viewBox="0 0 16 16" fill="currentColor">
+                        <path d="M13.485 1.929a1 1 0 010 1.414L6.343 10.485a1 1 0 01-1.414 0L1.515 7.07a1 1 0 011.414-1.414L5.636 8.364l6.435-6.435a1 1 0 011.414 0z"/>
+                      </svg>
+                    </span>
+                  )}
+                  {!pinVerified && (
+                    <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-gray-400">
+                      <svg className="w-4 h-4" viewBox="0 0 16 16" fill="currentColor">
+                        <path d="M4 6l4 4 4-4"/>
+                      </svg>
+                    </span>
+                  )}
+                </div>
+              ) : showUSCADropdown ? (
                 <div className="relative">
                   <select
                     className={`${getInputClass('state')} appearance-none pr-8 cursor-pointer`}
@@ -504,46 +736,58 @@ export default function CheckoutPage() {
             </div>
           </div>
 
-          {/* Postal Code */}
-          <div>
-            <label className="block text-xs font-medium text-gray-600 mb-1">
-              {LABELS.postalCode} <span className="text-red-500">*</span>
-              {POSTAL_PATTERNS[form.country] && (
-                <span className="text-gray-400 ml-1 text-xs">
-                  ({POSTAL_PATTERNS[form.country].hint})
-                </span>
-              )}
-            </label>
-            <div className="relative">
-              <input
-                className={getInputClass('postalCode')}
-                placeholder={POSTAL_PATTERNS[form.country]?.hint || 'Postal code'}
-                value={form.postalCode}
-                onChange={(e) => handleChange('postalCode', e.target.value)}
-                onBlur={() => handleBlur('postalCode')}
-                autoComplete="postal-code"
-              />
-              <FieldSuccess show={!!(touched.postalCode && !errors.postalCode && form.postalCode)} />
+          {/* Postal Code — non-India only (India handled above) */}
+          {!isIndia && (
+            <div>
+              <label className="block text-xs font-medium text-gray-600 mb-1">
+                {LABELS.postalCode} <span className="text-red-500">*</span>
+                {POSTAL_PATTERNS[form.country] && (
+                  <span className="text-gray-400 ml-1 text-xs">
+                    ({POSTAL_PATTERNS[form.country].hint})
+                  </span>
+                )}
+              </label>
+              <div className="relative">
+                <input
+                  className={getInputClass('postalCode')}
+                  placeholder={POSTAL_PATTERNS[form.country]?.hint || 'Postal code'}
+                  value={form.postalCode}
+                  onChange={(e) => handlePostalChange(e.target.value)}
+                  onBlur={() => handleBlur('postalCode')}
+                  autoComplete="postal-code"
+                />
+                <FieldSuccess show={!!(touched.postalCode && !errors.postalCode && form.postalCode)} />
+              </div>
+              <FieldError msg={errors.postalCode} />
             </div>
-            <FieldError msg={errors.postalCode} />
-          </div>
+          )}
 
           {/* Phone */}
           <div>
             <label className="block text-xs font-medium text-gray-600 mb-1">
-              {LABELS.phone}{' '}
-              <span className="text-gray-400 text-xs">(optional)</span>
+              {LABELS.phone} <span className="text-red-500">*</span>
             </label>
             <div className="relative">
-              <input
-                className={getInputClass('phone')}
-                type="tel"
-                placeholder="(555) 123-4567"
-                value={form.phone ? formatPhone(form.phone) : ''}
-                onChange={(e) => handlePhoneChange(e.target.value)}
-                onBlur={() => handleBlur('phone')}
-                autoComplete="tel"
-              />
+              <div className="flex">
+                {/* Country code prefix */}
+                <span className="inline-flex items-center px-3 rounded-l-lg border border-r-0 border-gray-300 bg-gray-50 text-gray-500 text-sm select-none">
+                  {form.country === 'IN' ? '+91' :
+                   form.country === 'US' || form.country === 'CA' ? '+1' :
+                   form.country === 'GB' ? '+44' :
+                   form.country === 'AU' ? '+61' :
+                   form.country === 'AE' ? '+971' : '+'}
+                </span>
+                <input
+                  className={`${getInputClass('phone')} rounded-l-none`}
+                  type="tel"
+                  placeholder={isIndia ? "98765 43210" : "(555) 123-4567"}
+                  value={form.phone ? formatPhone(form.phone, form.country) : ''}
+                  onChange={(e) => handlePhoneChange(e.target.value)}
+                  onBlur={() => handleBlur('phone')}
+                  autoComplete="tel"
+                  inputMode="numeric"
+                />
+              </div>
               <FieldSuccess show={!!(touched.phone && !errors.phone && form.phone)} />
             </div>
             <FieldError msg={errors.phone} />
@@ -556,13 +800,11 @@ export default function CheckoutPage() {
             </div>
           )}
 
-          {apiError && (
-            <p className="text-red-500 text-sm">{apiError}</p>
-          )}
+          {apiError && <p className="text-red-500 text-sm">{apiError}</p>}
 
           <button
             type="submit"
-            disabled={loading}
+            disabled={loading || pinLoading}
             className="btn-primary w-full py-3 mt-2 disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {loading ? 'Saving…' : `Continue to Payment • $${total.toFixed(2)}`}
@@ -576,6 +818,17 @@ export default function CheckoutPage() {
           <p className="text-gray-500 text-sm">
             Total: <span className="text-amber-600 font-bold text-lg">${total.toFixed(2)}</span>
           </p>
+
+          {/* Shipping summary */}
+          <div className="rounded-lg bg-gray-50 border border-gray-200 px-4 py-3 text-sm text-gray-600 space-y-1">
+            <p className="font-semibold text-gray-800 text-xs uppercase tracking-wide mb-2">Shipping to</p>
+            <p className="font-medium text-gray-900">{form.fullName}</p>
+            <p>{form.addressLine1}{form.addressLine2 ? `, ${form.addressLine2}` : ''}</p>
+            <p>{form.city}, {form.state} {form.postalCode}</p>
+            <p>{COUNTRIES.find((c) => c.code === form.country)?.name}</p>
+            {form.phone && <p>📞 {formatPhone(form.phone, form.country)}</p>}
+          </div>
+
           {apiError && <p className="text-red-500 text-sm">{apiError}</p>}
           <PayPalScriptProvider
             options={{

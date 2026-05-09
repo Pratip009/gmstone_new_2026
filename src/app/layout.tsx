@@ -20,7 +20,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           crossOrigin="anonymous"
         />
       </head>
-      <body style={{ background: "var(--bg)", color: "var(--text)" }}>
+      <body style={{ background: "var(--bg)", color: "var(--text)", position: "relative" }}>
         <Providers>
           <StartupLoader>{children}</StartupLoader>
         </Providers>

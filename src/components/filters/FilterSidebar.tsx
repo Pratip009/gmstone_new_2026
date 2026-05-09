@@ -32,25 +32,27 @@ interface FilterSidebarProps {
   };
 }
 
+const PRICE_BRACKETS = [
+  { label: 'Under $1,000',      min: '',      max: '1000'  },
+  { label: '$1,000 – $5,000',   min: '1000',  max: '5000'  },
+  { label: '$5,000 – $15,000',  min: '5000',  max: '15000' },
+  { label: '$15,000 – $50,000', min: '15000', max: '50000' },
+  { label: 'Over $50,000',      min: '50000', max: ''      },
+];
+
 export default function FilterSidebar({ productType = 'diamond', facets }: FilterSidebarProps) {
-  const router   = useRouter();
-  const pathname = usePathname();
+  const router       = useRouter();
+  const pathname     = usePathname();
   const searchParams = useSearchParams();
 
-  // ── Derive base route from current pathname ────────────────────────────────
-  // /products/watches → watches route
-  // /products/diamonds → diamonds route
-  // /products → generic route
   const baseRoute = pathname.includes('/watches')
     ? '/products/watches'
     : pathname.includes('/diamonds')
       ? '/products/diamonds'
       : '/products';
 
-  // ── Active mode: prop wins, but switcher can override locally ─────────────
   const [mode, setMode] = useState<'watch' | 'diamond'>(productType);
 
-  // ── Diamond active filters ─────────────────────────────────────────────────
   const activeShapes    = searchParams.get('shape')?.split(',').filter(Boolean)   || [];
   const activeColors    = searchParams.get('color')?.split(',').filter(Boolean)   || [];
   const activeClarities = searchParams.get('clarity')?.split(',').filter(Boolean) || [];
@@ -59,8 +61,7 @@ export default function FilterSidebar({ productType = 'diamond', facets }: Filte
   const sizeMin         = searchParams.get('sizeMin')  || '';
   const sizeMax         = searchParams.get('sizeMax')  || '';
 
-  // ── Watch active filters ───────────────────────────────────────────────────
-  const activeWatchGender        = searchParams.get('watchGender')              || '';
+  const activeWatchGender        = searchParams.get('watchGender') || '';
   const activeWatchBrands        = searchParams.get('watchBrand')?.split(',').filter(Boolean)        || [];
   const activeWatchMovements     = searchParams.get('watchMovement')?.split(',').filter(Boolean)     || [];
   const activeWatchStrapTypes    = searchParams.get('watchStrapType')?.split(',').filter(Boolean)    || [];
@@ -75,7 +76,6 @@ export default function FilterSidebar({ productType = 'diamond', facets }: Filte
   const [localSizeMin,  setLocalSizeMin]  = useState(sizeMin);
   const [localSizeMax,  setLocalSizeMax]  = useState(sizeMax);
 
-  // ── Helpers ────────────────────────────────────────────────────────────────
   const updateFilter = useCallback(
     (key: string, value: string | null) => {
       const params = new URLSearchParams(searchParams.toString());
@@ -106,10 +106,18 @@ export default function FilterSidebar({ productType = 'diamond', facets }: Filte
     router.push(`${baseRoute}?${params.toString()}`);
   };
 
-  // ── Clear all: go to the correct base route, not always /products ──────────
+  const applyPriceBracket = (min: string, max: string) => {
+    setLocalPriceMin(min);
+    setLocalPriceMax(max);
+    const params = new URLSearchParams(searchParams.toString());
+    min ? params.set('priceMin', min) : params.delete('priceMin');
+    max ? params.set('priceMax', max) : params.delete('priceMax');
+    params.set('page', '1');
+    router.push(`${baseRoute}?${params.toString()}`);
+  };
+
   const clearAll = () => router.push(baseRoute);
 
-  // ── Switch mode: navigate to the other route and clear filters ────────────
   const switchMode = (next: 'watch' | 'diamond') => {
     setMode(next);
     router.push(next === 'watch' ? '/products/watches' : '/products/diamonds');
@@ -126,30 +134,33 @@ export default function FilterSidebar({ productType = 'diamond', facets }: Filte
   const countFor = (list: FacetCount[] | undefined, id: string) =>
     list?.find((f) => f._id === id)?.count;
 
-  // ── Render ─────────────────────────────────────────────────────────────────
   return (
-    <aside className="w-56 shrink-0 space-y-6 text-sm">
+    <aside
+      className="w-full space-y-0 bg-white"
+      style={{ fontFamily: "'Poppins', sans-serif" }}
+    >
+    
 
-      {/* ── TYPE SWITCHER ────────────────────────────────────────────────────── */}
-      <div className="flex rounded-sm overflow-hidden border border-neutral-700">
+      {/* ── Type switcher ──────────────────────────────────────────────────── */}
+      <div className="flex rounded-lg overflow-hidden border border-gray-200 bg-white mb-5">
         <button
           onClick={() => switchMode('diamond')}
-          className={`flex-1 flex items-center justify-center gap-1.5 py-2 text-[11px] font-semibold tracking-widest uppercase transition-colors ${
+          className={`flex-1 flex items-center justify-center gap-1.5 py-2.5 text-[9px] font-semibold tracking-[0.18em] uppercase transition-all duration-200 ${
             mode === 'diamond'
-              ? 'bg-neutral-100 text-neutral-900'
-              : 'bg-transparent text-neutral-500 hover:text-neutral-300'
+              ? 'bg-gray-900 text-white rounded-md m-0.5'
+              : 'text-gray-400 hover:text-gray-700'
           }`}
         >
           <DiamondIcon active={mode === 'diamond'} />
           Diamonds
         </button>
-        <div className="w-px bg-neutral-700" />
+        <div className="w-px bg-gray-100" />
         <button
           onClick={() => switchMode('watch')}
-          className={`flex-1 flex items-center justify-center gap-1.5 py-2 text-[11px] font-semibold tracking-widest uppercase transition-colors ${
+          className={`flex-1 flex items-center justify-center gap-1.5 py-2.5 text-[9px] font-semibold tracking-[0.18em] uppercase transition-all duration-200 ${
             mode === 'watch'
-              ? 'bg-neutral-100 text-neutral-900'
-              : 'bg-transparent text-neutral-500 hover:text-neutral-300'
+              ? 'bg-gray-900 text-white rounded-md m-0.5'
+              : 'text-gray-400 hover:text-gray-700'
           }`}
         >
           <WatchIcon active={mode === 'watch'} />
@@ -157,68 +168,62 @@ export default function FilterSidebar({ productType = 'diamond', facets }: Filte
         </button>
       </div>
 
-      {/* ── HEADER ───────────────────────────────────────────────────────────── */}
-      <div className="flex items-center justify-between">
-        <h2 className="font-semibold text-neutral-200">Filters</h2>
+      {/* ── Filters header ─────────────────────────────────────────────────── */}
+      <div className="flex items-center justify-between mb-1 px-0.5">
+        <span className="text-[9px] tracking-[0.35em] uppercase font-semibold text-gray-300">
+          Refine
+        </span>
         {hasActiveFilters ? (
-          <button onClick={clearAll} className="text-xs text-amber-400 hover:text-amber-300">
+          <button
+            onClick={clearAll}
+            className="text-[10px] text-[#B8975A] hover:text-[#8A6C38] font-medium transition-colors"
+          >
             Clear all
           </button>
         ) : null}
       </div>
 
-      {/* ── PRICE RANGE (shared) ─────────────────────────────────────────────── */}
+      {/* ── Price (shared) ─────────────────────────────────────────────────── */}
       <FilterGroup label="Price (USD)">
-        {[
-          { label: 'Under $1,000',      min: '',     max: '1000'  },
-          { label: '$1,000 – $5,000',   min: '1000', max: '5000'  },
-          { label: '$5,000 – $15,000',  min: '5000', max: '15000' },
-          { label: '$15,000 – $50,000', min: '15000',max: '50000' },
-          { label: 'Over $50,000',      min: '50000',max: ''      },
-        ].map(({ label, min, max }) => {
-          const isActive = localPriceMin === min && localPriceMax === max;
-          return (
-            <button
-              key={label}
-              onClick={() => {
-                setLocalPriceMin(min);
-                setLocalPriceMax(max);
-                const params = new URLSearchParams(searchParams.toString());
-                min ? params.set('priceMin', min) : params.delete('priceMin');
-                max ? params.set('priceMax', max) : params.delete('priceMax');
-                params.set('page', '1');
-                router.push(`${baseRoute}?${params.toString()}`);
-              }}
-              className={`block w-full text-left px-2 py-1 rounded text-xs transition-colors ${
-                isActive
-                  ? 'bg-amber-500/20 text-amber-400 font-semibold'
-                  : 'text-neutral-400 hover:text-white'
-              }`}
-            >
-              {label}
-            </button>
-          );
-        })}
-        <div className="flex gap-2 mt-2">
+        <div className="space-y-0.5 mb-3">
+          {PRICE_BRACKETS.map(({ label, min, max }) => {
+            const isActive = localPriceMin === min && localPriceMax === max
+              && (priceMin === min || priceMax === max);
+            return (
+              <button
+                key={label}
+                onClick={() => applyPriceBracket(min, max)}
+                className={`block w-full text-left px-2.5 py-[5px] rounded-md text-[11px] transition-all duration-150 ${
+                  isActive
+                    ? 'bg-[#B8975A]/10 text-[#8A6C38] font-semibold'
+                    : 'text-gray-400 hover:bg-gray-50 hover:text-gray-800'
+                }`}
+              >
+                {label}
+              </button>
+            );
+          })}
+        </div>
+        <div className="flex gap-1.5 mb-2">
           <input
-            type="number" placeholder="Min"
-            className="input text-xs py-1 px-2"
+            type="number"
+            placeholder="Min $"
             value={localPriceMin}
             onChange={(e) => setLocalPriceMin(e.target.value)}
+            className="w-0 min-w-0 flex-1 px-2 py-1.5 text-[11px] border border-gray-200 rounded-md bg-white text-gray-800 placeholder-gray-300 outline-none focus:border-[#B8975A] focus:ring-1 focus:ring-[#B8975A]/20 transition-all [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
           />
           <input
-            type="number" placeholder="Max"
-            className="input text-xs py-1 px-2"
+            type="number"
+            placeholder="Max $"
             value={localPriceMax}
             onChange={(e) => setLocalPriceMax(e.target.value)}
+            className="w-0 min-w-0 flex-1 px-2 py-1.5 text-[11px] border border-gray-200 rounded-md bg-white text-gray-800 placeholder-gray-300 outline-none focus:border-[#B8975A] focus:ring-1 focus:ring-[#B8975A]/20 transition-all [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
           />
         </div>
-        <button onClick={applyRanges} className="btn-secondary w-full mt-2 text-xs py-1.5">
-          Apply
-        </button>
+        <ApplyButton onClick={applyRanges} />
       </FilterGroup>
 
-      {/* ── IN STOCK (shared) ────────────────────────────────────────────────── */}
+      {/* ── Availability (shared) ──────────────────────────────────────────── */}
       <FilterGroup label="Availability">
         <CheckItem
           label="In Stock Only"
@@ -229,9 +234,9 @@ export default function FilterSidebar({ productType = 'diamond', facets }: Filte
         />
       </FilterGroup>
 
-      {/* ════════════════════════════════════════════════════════════════════════
+      {/* ══════════════════════════════════════════════════════════════════════
           WATCH FILTERS
-         ════════════════════════════════════════════════════════════════════════ */}
+         ══════════════════════════════════════════════════════════════════════ */}
       {mode === 'watch' && (
         <>
           <FilterGroup label="Gender">
@@ -335,9 +340,9 @@ export default function FilterSidebar({ productType = 'diamond', facets }: Filte
         </>
       )}
 
-      {/* ════════════════════════════════════════════════════════════════════════
+      {/* ══════════════════════════════════════════════════════════════════════
           DIAMOND FILTERS
-         ════════════════════════════════════════════════════════════════════════ */}
+         ══════════════════════════════════════════════════════════════════════ */}
       {mode === 'diamond' && (
         <>
           <FilterGroup label="Shape">
@@ -352,7 +357,7 @@ export default function FilterSidebar({ productType = 'diamond', facets }: Filte
             ))}
           </FilterGroup>
 
-          <FilterGroup label="Color">
+          <FilterGroup label="Color Grade">
             {DISPLAY_COLORS.map((color) => (
               <CheckItem
                 key={color} label={color}
@@ -374,27 +379,36 @@ export default function FilterSidebar({ productType = 'diamond', facets }: Filte
             ))}
           </FilterGroup>
 
-          <FilterGroup label="Size (Carat)">
-            <div className="flex gap-2">
+          <FilterGroup label="Carat Weight">
+            <div className="flex gap-1.5 mb-2">
               <input
-                type="number" placeholder="Min" step="0.01"
-                className="input text-xs py-1 px-2"
+                type="number"
+                placeholder="Min ct"
+                step="0.01"
                 value={localSizeMin}
                 onChange={(e) => setLocalSizeMin(e.target.value)}
+                className="w-0 min-w-0 flex-1 px-2 py-1.5 text-[11px] border border-gray-200 rounded-md bg-white text-gray-800 placeholder-gray-300 outline-none focus:border-[#B8975A] focus:ring-1 focus:ring-[#B8975A]/20 transition-all [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
               />
               <input
-                type="number" placeholder="Max" step="0.01"
-                className="input text-xs py-1 px-2"
+                type="number"
+                placeholder="Max ct"
+                step="0.01"
                 value={localSizeMax}
                 onChange={(e) => setLocalSizeMax(e.target.value)}
+                className="w-0 min-w-0 flex-1 px-2 py-1.5 text-[11px] border border-gray-200 rounded-md bg-white text-gray-800 placeholder-gray-300 outline-none focus:border-[#B8975A] focus:ring-1 focus:ring-[#B8975A]/20 transition-all [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
               />
             </div>
-            <button onClick={applyRanges} className="btn-secondary w-full mt-2 text-xs py-1.5">
-              Apply
-            </button>
+            <ApplyButton onClick={applyRanges} />
           </FilterGroup>
         </>
       )}
+
+      {/* ── Footer note ────────────────────────────────────────────────────── */}
+      <div className="pt-5 pb-2 text-center">
+        <p className="text-[9px] tracking-[0.2em] uppercase text-gray-300">
+          All stones GIA / IGI certified
+        </p>
+      </div>
     </aside>
   );
 }
@@ -402,8 +416,8 @@ export default function FilterSidebar({ productType = 'diamond', facets }: Filte
 // ─── Icons ────────────────────────────────────────────────────────────────────
 function DiamondIcon({ active }: { active: boolean }) {
   return (
-    <svg width="11" height="11" viewBox="0 0 18 18" fill="none" aria-hidden="true"
-      style={{ color: active ? '#171717' : 'currentColor' }}>
+    <svg width="11" height="11" viewBox="0 0 18 18" fill="none"
+      style={{ color: active ? 'white' : 'currentColor' }}>
       <path d="M9 16L2 7l2.5-5h9L16 7z" stroke="currentColor" strokeWidth="1.4" strokeLinejoin="round" />
       <path d="M2 7h14M9 16L5 7l4-5 4 5z" stroke="currentColor" strokeWidth="1" strokeLinejoin="round" />
     </svg>
@@ -412,8 +426,8 @@ function DiamondIcon({ active }: { active: boolean }) {
 
 function WatchIcon({ active }: { active: boolean }) {
   return (
-    <svg width="11" height="11" viewBox="0 0 18 18" fill="none" aria-hidden="true"
-      style={{ color: active ? '#171717' : 'currentColor' }}>
+    <svg width="11" height="11" viewBox="0 0 18 18" fill="none"
+      style={{ color: active ? 'white' : 'currentColor' }}>
       <circle cx="9" cy="9" r="6" stroke="currentColor" strokeWidth="1.4" />
       <path d="M9 6v3l2 1.5" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" />
       <rect x="7" y="1.5" width="4" height="2" rx="0.5" stroke="currentColor" strokeWidth="1" />
@@ -423,18 +437,40 @@ function WatchIcon({ active }: { active: boolean }) {
 }
 
 // ─── Sub-components ───────────────────────────────────────────────────────────
+function ApplyButton({ onClick }: { onClick: () => void }) {
+  return (
+    <button
+      onClick={onClick}
+      className="w-full py-1.5 text-[10px] font-semibold tracking-[0.2em] uppercase border border-[#B8975A] text-[#B8975A] rounded-md hover:bg-[#B8975A] hover:text-white transition-all duration-200"
+    >
+      Apply
+    </button>
+  );
+}
+
 function FilterGroup({ label, children }: { label: string; children: React.ReactNode }) {
   const [open, setOpen] = useState(true);
   return (
-    <div className="border-t border-neutral-800 pt-4">
+    <div className="border-t border-gray-100">
       <button
-        className="flex items-center justify-between w-full text-xs font-semibold uppercase tracking-widest text-neutral-400 mb-3"
         onClick={() => setOpen(!open)}
+        className="flex items-center justify-between w-full py-3.5 text-left group"
       >
-        {label}
-        <span className="text-neutral-600">{open ? '−' : '+'}</span>
+        <span className="text-[9px] font-semibold uppercase tracking-[0.28em] text-gray-500 group-hover:text-[#B8975A] transition-colors">
+          {label}
+        </span>
+        <span
+          className="text-gray-300 text-[10px] transition-transform duration-200"
+          style={{ transform: open ? 'rotate(0deg)' : 'rotate(-90deg)' }}
+        >
+          {open ? '−' : '+'}
+        </span>
       </button>
-      {open && <div className="space-y-1.5">{children}</div>}
+      {open && (
+        <div className="space-y-0.5 pb-3.5">
+          {children}
+        </div>
+      )}
     </div>
   );
 }
@@ -448,18 +484,36 @@ function CheckItem({
   onChange: () => void;
 }) {
   return (
-    <label className="flex items-center gap-2 cursor-pointer group">
-      <input
-        type="checkbox"
-        checked={checked}
-        onChange={onChange}
-        className="accent-amber-500 w-3.5 h-3.5"
-      />
-      <span className={`text-xs group-hover:text-white transition-colors ${checked ? 'text-white' : 'text-neutral-400'}`}>
+    <label className="flex items-center gap-2 cursor-pointer group py-[3px]">
+      <span
+        className={`w-3.5 h-3.5 flex-shrink-0 rounded-[3px] border flex items-center justify-center transition-all duration-150 ${
+          checked
+            ? 'bg-[#B8975A] border-[#B8975A]'
+            : 'border-gray-200 bg-white group-hover:border-[#B8975A]'
+        }`}
+      >
+        {checked && (
+          <svg width="8" height="8" viewBox="0 0 8 8" fill="none">
+            <polyline
+              points="1.5,4 3.2,5.8 6.5,2"
+              stroke="white"
+              strokeWidth="1.5"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
+          </svg>
+        )}
+      </span>
+      <input type="checkbox" checked={checked} onChange={onChange} className="sr-only" />
+      <span
+        className={`text-[11px] flex-1 transition-colors leading-snug ${
+          checked ? 'text-gray-900 font-medium' : 'text-gray-400 group-hover:text-gray-800'
+        }`}
+      >
         {label}
       </span>
       {count !== undefined && (
-        <span className="text-neutral-600 text-xs ml-auto">({count})</span>
+        <span className="text-[10px] text-gray-300 ml-auto">{count}</span>
       )}
     </label>
   );

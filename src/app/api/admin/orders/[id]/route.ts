@@ -1,12 +1,12 @@
-import { NextRequest } from 'next/server';
 import { connectDB } from '@/lib/db';
 import Order from '@/models/Order';
-import { withAdmin } from '@/middleware/auth.middleware';
+import { withAdmin, AuthenticatedRequest } from '@/middleware/auth.middleware';
 import { successResponse, errorResponse } from '@/lib/api-response';
 
-export const PUT = withAdmin(async (req: NextRequest, { params }) => {
+export const PUT = withAdmin(async (req: AuthenticatedRequest, context: { params: Promise<{ id: string }> }) => {
   try {
     await connectDB();
+    const { id } = await context.params;
     const { status } = await req.json();
 
     const validStatuses = ['pending', 'paid', 'processing', 'shipped', 'delivered', 'cancelled', 'refunded'];
@@ -15,14 +15,15 @@ export const PUT = withAdmin(async (req: NextRequest, { params }) => {
     }
 
     const order = await Order.findByIdAndUpdate(
-      params.id,
+      id,
       { $set: { status } },
       { new: true }
     ).lean();
 
     if (!order) return errorResponse('Order not found', 404);
     return successResponse(order);
-  } catch {
+  } catch (err) {
+    console.error('[updateOrder]', err);
     return errorResponse('Failed to update order', 500);
   }
 });

@@ -114,3 +114,15 @@ export async function getAllOrders(page = 1, limit = 20, status?: string) {
 
   return { orders, total };
 }
+
+// ← ADD THIS
+export async function updateOrderStatus(orderId: string, status: string) {
+  const validStatuses = ['pending', 'paid', 'processing', 'shipped', 'delivered', 'cancelled', 'refunded'];
+  if (!validStatuses.includes(status)) throw new Error('Invalid status');
+
+  return Order.findByIdAndUpdate(
+    orderId,
+    { $set: { status } },
+    { new: true }
+  ).populate('user', 'name email').lean();
+}

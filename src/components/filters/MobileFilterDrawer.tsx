@@ -14,7 +14,7 @@ export default function MobileFilterDrawer({ facets }: MobileFilterDrawerProps) 
       {/* Trigger button */}
       <button
         onClick={() => setOpen(true)}
-        className="flex items-center gap-2 border-[1.5px] border-[#0f0f0f] text-[#0f0f0f] text-[10px] font-semibold tracking-[0.12em] uppercase px-3.5 py-2 rounded-[2px] bg-white hover:bg-[#f7f6f3] transition-colors"
+        className="flex items-center gap-2 border-[1.5px] border-[#0f0f0f] text-[#0f0f0f] text-[10px] font-semibold tracking-[0.12em] uppercase px-3.5 py-2 rounded-[2px] bg-white hover:bg-[#ffffff] transition-colors"
       >
         <svg width="14" height="12" viewBox="0 0 14 12" fill="none">
           <path d="M1 1h12M3 6h8M5 11h4" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
@@ -32,7 +32,7 @@ export default function MobileFilterDrawer({ facets }: MobileFilterDrawerProps) 
 
       {/* Slide-in drawer */}
       <div
-        className={`fixed inset-y-0 left-0 z-50 w-[300px] max-w-[85vw] bg-[#f7f6f3] shadow-[4px_0_24px_rgba(0,0,0,0.12)] transform transition-transform duration-300 ease-in-out flex flex-col
+        className={`fixed inset-y-0 left-0 z-50 w-[300px] max-w-[85vw] bg-[#ffffff] shadow-[4px_0_24px_rgba(0,0,0,0.12)] transform transition-transform duration-300 ease-in-out flex flex-col
           ${open ? 'translate-x-0' : '-translate-x-full'}
         `}
       >
