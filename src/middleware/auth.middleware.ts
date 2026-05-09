@@ -26,11 +26,10 @@ export function withAuth(handler: RouteHandler) {
       }
 
       const payload = verifyToken(token);
-
       (req as AuthenticatedRequest).user = payload;
-
       return handler(req as AuthenticatedRequest, context);
-    } catch {
+    } catch (err) {
+      console.error('Auth verification failed:', err);
       return NextResponse.json(
         { success: false, message: 'Invalid or expired token' },
         { status: 401 }
@@ -51,7 +50,6 @@ export function withAdmin(handler: RouteHandler) {
           { status: 403 }
         );
       }
-
       return handler(req, context);
     }
   );
@@ -69,17 +67,14 @@ export function withOptionalAuth(
   ): Promise<Response> => {
     try {
       const token = extractTokenFromHeader(req.headers.get('authorization'));
-
       if (token) {
         const payload = verifyToken(token);
-
         (req as NextRequest & { user?: JWTPayload }).user = payload;
       }
-    } catch {}
+    } catch (err) {
+      console.error('Optional auth verification failed:', err);
+    }
 
-    return handler(
-      req as NextRequest & { user?: JWTPayload },
-      context
-    );
+    return handler(req as NextRequest & { user?: JWTPayload }, context);
   };
 }

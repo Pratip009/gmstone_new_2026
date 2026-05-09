@@ -22,24 +22,23 @@ export async function POST(req: NextRequest) {
     const { email, password } = parsed.data;
     const result = await login(email, password);
 
-    // ✅ Set cookie server-side so Next.js middleware can read it
     const response = NextResponse.json(
       { success: true, data: result },
       { status: 200 }
     );
 
     response.cookies.set('auth_token', result.token, {
-      httpOnly: false, // false so client JS (useAuth) can also read it
+      httpOnly: true,                                    // ✅ fixed: no JS access
       secure: process.env.NODE_ENV === 'production',
       sameSite: 'lax',
-      maxAge: 60 * 60 * 24 * 7, // 7 days
+      maxAge: 60 * 60 * 24 * 7,
       path: '/',
     });
 
     return response;
   } catch (err) {
-    const message = err instanceof Error ? err.message : 'Login failed';
-    const status = message.includes('Invalid credentials') ? 401 : 500;
-    return errorResponse(message, status);
+    console.error('[login]', err);
+    // ✅ fixed: generic message to prevent email enumeration
+    return errorResponse('Invalid email or password', 401);
   }
 }

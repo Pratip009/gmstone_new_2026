@@ -23,24 +23,23 @@ export async function POST(req: NextRequest) {
     const { name, email, password } = parsed.data;
     const result = await signup(name, email, password);
 
-    // ✅ Set cookie server-side so Next.js middleware can read it
     const response = NextResponse.json(
       { success: true, data: result },
       { status: 201 }
     );
 
     response.cookies.set('auth_token', result.token, {
-      httpOnly: false, // false so client JS (useAuth) can also read it
+      httpOnly: true,                                    // ✅ fixed: no JS access
       secure: process.env.NODE_ENV === 'production',
       sameSite: 'lax',
-      maxAge: 60 * 60 * 24 * 7, // 7 days
+      maxAge: 60 * 60 * 24 * 7,
       path: '/',
     });
 
     return response;
   } catch (err) {
-    const message = err instanceof Error ? err.message : 'Signup failed';
-    const status = message.includes('already registered') ? 409 : 500;
-    return errorResponse(message, status);
+    console.error('[signup]', err);
+    // ✅ fixed: generic message to prevent email enumeration
+    return errorResponse('Could not create account. Please try again.', 500);
   }
 }
