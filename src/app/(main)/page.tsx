@@ -5,7 +5,8 @@ import TrustBadges from "@/components/ui/TrustBadges";
 import Testimonials from "@/components/ui/Testimonials";
 import SpecialsMarquee from "@/components/ui/Specialsmarquee";
 import FeaturedInNews from "@/components/ui/FeaturedInNews";
-import VideoTextReveal from "@/components/ui/VideoRevealHero";
+import JewelryModal from "@/components/ui/Jewelrymodal";
+
 
 export default function HomePage() {
   return (
@@ -15,11 +16,12 @@ export default function HomePage() {
       </section>
       <TrustBadges />
       <ShopByCategory />
-      <VideoTextReveal/>
+   
       <SpecialsMarquee/>
       <GemsPromise />
       <Testimonials/>
       <FeaturedInNews/>
+      <JewelryModal/>
     </main>
   );
 }

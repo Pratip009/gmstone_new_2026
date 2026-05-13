@@ -279,3 +279,13 @@ h1, h2, h3, h4 {
   85%  { opacity: 1; }
   100% { left: 110%; opacity: 0; }
 }
+
+@import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Josefin+Sans:wght@100;300;400;500&display=swap');
+
+.font-bebas {
+  font-family: 'Bebas Neue', sans-serif;
+}
+
+.font-josefin {
+  font-family: 'Josefin Sans', sans-serif;
+}

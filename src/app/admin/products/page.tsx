@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useState, useMemo } from "react";
+import { useEffect, useState, useMemo, useRef } from "react";
 import { useApi } from "@/hooks/useApi";
 import {
   SHAPES, COLORS, CLARITIES, CERTIFICATIONS,
@@ -153,6 +153,29 @@ const css = `
   .ap-modal-confirm-btn { flex: 1; height: 40px; background: #dc2626; border: none; border-radius: 8px; font-family: 'DM Sans', sans-serif; font-size: 0.825rem; font-weight: 600; color: #fff; cursor: pointer; transition: background 0.15s; }
   .ap-modal-confirm-btn:hover { background: #b91c1c; }
   .ap-modal-confirm-btn:disabled { background: #fca5a5; cursor: not-allowed; }
+
+  /* ── Image Uploader ── */
+  .ap-uploader { grid-column: span 2; }
+  .ap-drop-zone { border: 2px dashed #d1cec7; border-radius: 10px; background: #fafaf8; padding: 1.5rem 1rem; text-align: center; cursor: pointer; transition: border-color 0.15s, background 0.15s; position: relative; }
+  .ap-drop-zone:hover, .ap-drop-zone.drag-over { border-color: #b45309; background: #fffbeb; }
+  .ap-drop-zone input[type=file] { position: absolute; inset: 0; opacity: 0; cursor: pointer; width: 100%; height: 100%; }
+  .ap-drop-icon { font-size: 1.6rem; margin-bottom: 0.4rem; }
+  .ap-drop-text { font-size: 0.85rem; color: #64748b; }
+  .ap-drop-text strong { color: #b45309; }
+  .ap-drop-hint { font-size: 0.72rem; color: #94a3b8; margin-top: 0.25rem; }
+
+  .ap-img-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(88px, 1fr)); gap: 8px; margin-top: 0.75rem; }
+  .ap-img-thumb { position: relative; aspect-ratio: 1; border-radius: 8px; overflow: hidden; border: 1.5px solid #e2e0da; background: #f1f0ec; }
+  .ap-img-thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
+  .ap-img-remove { position: absolute; top: 4px; right: 4px; width: 20px; height: 20px; border-radius: 50%; background: rgba(15,23,42,0.7); border: none; color: #fff; font-size: 11px; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: background 0.12s; line-height: 1; }
+  .ap-img-remove:hover { background: #dc2626; }
+  .ap-img-uploading { position: absolute; inset: 0; background: rgba(255,255,255,0.75); display: flex; align-items: center; justify-content: center; font-size: 0.65rem; font-weight: 700; color: #b45309; flex-direction: column; gap: 4px; }
+  .ap-img-spinner { width: 18px; height: 18px; border: 2px solid #fde68a; border-top-color: #b45309; border-radius: 50%; animation: ap-spin 0.7s linear infinite; }
+  @keyframes ap-spin { to { transform: rotate(360deg); } }
+  .ap-upload-error { font-size: 0.72rem; color: #dc2626; margin-top: 0.35rem; }
+  .ap-uploading-bar { height: 3px; background: #fde68a; border-radius: 2px; margin-top: 0.5rem; overflow: hidden; }
+  .ap-uploading-bar-inner { height: 100%; background: #b45309; border-radius: 2px; animation: ap-bar 1.2s ease-in-out infinite; }
+  @keyframes ap-bar { 0% { width: 0%; margin-left: 0; } 50% { width: 60%; margin-left: 20%; } 100% { width: 0%; margin-left: 100%; } }
 `;
 
 /* ── Interfaces ───────────────────────────────────────────────────────────── */
@@ -167,7 +190,6 @@ interface Product {
   stock: number;
   isActive: boolean;
   category?: { _id: string; name: string } | string;
-  // watch fields for display
   watchBrand?: string;
   watchMovement?: string;
   watchGender?: string;
@@ -197,7 +219,6 @@ const EMPTY_DIAMOND_FORM = {
   clarities: [] as string[],
   certifications: [] as string[],
   stock: "",
-  images: "",
   description: "",
 };
 
@@ -208,7 +229,6 @@ const EMPTY_WATCH_FORM = {
   subcategory: "",
   price: "",
   stock: "",
-  images: "",
   description: "",
   watchGender: "",
   watchBrand: "",
@@ -223,7 +243,6 @@ const EMPTY_WATCH_FORM = {
 
 type DiamondForm = typeof EMPTY_DIAMOND_FORM;
 type WatchForm = typeof EMPTY_WATCH_FORM;
-type FormState = DiamondForm | WatchForm;
 
 /* ── ConfirmModal ─────────────────────────────────────────────────────────── */
 function ConfirmDeleteModal({
@@ -331,6 +350,156 @@ function PillGroup({
   );
 }
 
+/* ── ImageUploadItem ──────────────────────────────────────────────────────── */
+interface UploadItem {
+  id: string;           // local stable key
+  previewUrl: string;   // object URL for instant preview
+  cloudUrl: string | null;  // Cloudinary URL once uploaded
+  status: "uploading" | "done" | "error";
+  errorMsg?: string;
+}
+
+/* ── ImageUploader ────────────────────────────────────────────────────────── */
+function ImageUploader({
+  items,
+  onChange,
+  apiFetch,
+}: {
+  items: UploadItem[];
+  onChange: (items: UploadItem[] | ((prev: UploadItem[]) => UploadItem[])) => void;  // ← updated
+  apiFetch: (url: string, opts?: RequestInit) => Promise<unknown>;
+}) {
+  const [dragOver, setDragOver] = useState(false);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  const uploadFiles = async (files: FileList | File[]) => {
+    const fileArr = Array.from(files).filter((f) => f.type.startsWith("image/"));
+    if (!fileArr.length) return;
+
+    // Create placeholder items immediately so previews appear right away
+    const newItems: UploadItem[] = fileArr.map((f) => ({
+      id: `${Date.now()}-${Math.random()}`,
+      previewUrl: URL.createObjectURL(f),
+      cloudUrl: null,
+      status: "uploading" as const,
+    }));
+
+    onChange([...items, ...newItems]);
+
+    // Upload all files in one multipart request
+    const fd = new FormData();
+    fileArr.forEach((f) => fd.append("files", f));
+
+    try {
+      const res = await apiFetch("/api/admin/upload", { method: "POST", body: fd }) as {
+        urls: string[];
+      };
+
+      onChange((prev: UploadItem[]) =>
+        prev.map((item) => {
+          const idx = newItems.findIndex((n) => n.id === item.id);
+          if (idx === -1) return item;
+          return { ...item, cloudUrl: res.urls[idx], status: "done" as const };
+        })
+      );
+    } catch (err) {
+      onChange((prev: UploadItem[]) =>
+        prev.map((item) =>
+          newItems.find((n) => n.id === item.id)
+            ? { ...item, status: "error" as const, errorMsg: err instanceof Error ? err.message : "Upload failed" }
+            : item
+        )
+      );
+    }
+  };
+
+  const remove = (id: string) => {
+    onChange(items.filter((i) => i.id !== id));
+  };
+
+  const onDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    setDragOver(false);
+    if (e.dataTransfer.files.length) uploadFiles(e.dataTransfer.files);
+  };
+
+  return (
+    <div className="ap-uploader">
+      <label className="ap-label">
+        Product Images
+        <span className="ap-label-hint">JPG, PNG, WebP · up to 10 MB each</span>
+      </label>
+
+      {/* Drop zone */}
+      <div
+        className={`ap-drop-zone${dragOver ? " drag-over" : ""}`}
+        onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
+        onDragLeave={() => setDragOver(false)}
+        onDrop={onDrop}
+        onClick={() => inputRef.current?.click()}
+      >
+        <input
+          ref={inputRef}
+          type="file"
+          accept="image/*"
+          multiple
+          style={{ display: "none" }}
+          onChange={(e) => { if (e.target.files) uploadFiles(e.target.files); e.target.value = ""; }}
+        />
+        <div className="ap-drop-icon">🖼</div>
+        <div className="ap-drop-text">
+          <strong>Click to browse</strong> or drag &amp; drop images here
+        </div>
+        <div className="ap-drop-hint">Multiple files supported</div>
+      </div>
+
+      {/* Uploading progress bar */}
+      {items.some((i) => i.status === "uploading") && (
+        <div className="ap-uploading-bar">
+          <div className="ap-uploading-bar-inner" />
+        </div>
+      )}
+
+      {/* Thumbnails */}
+      {items.length > 0 && (
+        <div className="ap-img-grid">
+          {items.map((item) => (
+            <div key={item.id} className="ap-img-thumb">
+              <img src={item.previewUrl} alt="" />
+              {item.status === "uploading" && (
+                <div className="ap-img-uploading">
+                  <div className="ap-img-spinner" />
+                  <span>Uploading…</span>
+                </div>
+              )}
+              {item.status === "error" && (
+                <div className="ap-img-uploading" style={{ background: "rgba(254,242,242,0.9)", color: "#dc2626" }}>
+                  <span>✕ Failed</span>
+                </div>
+              )}
+              <button
+                type="button"
+                className="ap-img-remove"
+                onClick={(e) => { e.stopPropagation(); remove(item.id); }}
+                title="Remove image"
+              >
+                ✕
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Per-item errors */}
+      {items.filter((i) => i.status === "error").map((i) => (
+        <div key={i.id} className="ap-upload-error">
+          ⚠ {i.errorMsg ?? "Upload failed for one image"}
+        </div>
+      ))}
+    </div>
+  );
+}
+
 type SortKey = "name" | "price" | "stock";
 type SortDir = "asc" | "desc";
 
@@ -349,6 +518,7 @@ function AddProductForm({
   const [productType, setProductType] = useState<ProductType>("diamond");
   const [diamondForm, setDiamondForm] = useState<DiamondForm>({ ...EMPTY_DIAMOND_FORM });
   const [watchForm, setWatchForm] = useState<WatchForm>({ ...EMPTY_WATCH_FORM });
+  const [uploadItems, setUploadItems] = useState<UploadItem[]>([]);
   const [subcategories, setSubcategories] = useState<Subcategory[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -376,6 +546,12 @@ function AddProductForm({
     e.preventDefault();
     setError("");
 
+    // Block submit if any image is still uploading
+    if (uploadItems.some((i) => i.status === "uploading")) {
+      setError("Please wait for all images to finish uploading.");
+      return;
+    }
+
     if (productType === "diamond") {
       if (diamondForm.shapes.length === 0) { setError("Select at least one shape"); return; }
       if (diamondForm.colors.length === 0) { setError("Select at least one color"); return; }
@@ -385,14 +561,19 @@ function AddProductForm({
       if (!watchForm.watchMovement) { setError("Movement type is required"); return; }
     }
 
+    // Collect successfully uploaded Cloudinary URLs
+    const imageUrls = uploadItems
+      .filter((i) => i.status === "done" && i.cloudUrl)
+      .map((i) => i.cloudUrl as string);
+
     setLoading(true);
     try {
       let payload: Record<string, unknown>;
 
       if (productType === "diamond") {
-        const { shapes, colors, clarities, certifications, images: rawImages, productType: _pt, ...rest } = diamondForm;
+        const { shapes, colors, clarities, certifications, productType: _pt, ...rest } = diamondForm;
         payload = {
-          productType: "diamond",           // ← ADD THIS
+          productType: "diamond",
           ...rest,
           price: Number(diamondForm.price),
           size: Number(diamondForm.size),
@@ -401,17 +582,17 @@ function AddProductForm({
           color: colors,
           clarity: clarities,
           certification: certifications,
-          images: rawImages.split("\n").map((s) => s.trim()).filter(Boolean),
+          images: imageUrls,
         };
       } else {
-        const { images: rawImages, productType: _pt, watchFeatures, ...rest } = watchForm;
+        const { productType: _pt, watchFeatures, ...rest } = watchForm;
         payload = {
-          productType: "watch",             // ← ADD THIS
+          productType: "watch",
           ...rest,
           price: Number(watchForm.price),
           stock: Number(watchForm.stock),
           watchFeatures,
-          images: rawImages.split("\n").map((s) => s.trim()).filter(Boolean),
+          images: imageUrls,
         };
         Object.keys(payload).forEach((k) => {
           if (payload[k] === "") delete payload[k];
@@ -421,6 +602,7 @@ function AddProductForm({
       await apiFetch("/api/admin/products", { method: "POST", body: JSON.stringify(payload) });
       setDiamondForm({ ...EMPTY_DIAMOND_FORM });
       setWatchForm({ ...EMPTY_WATCH_FORM });
+      setUploadItems([]);
       setSubcategories([]);
       onSuccess();
     } catch (err) {
@@ -431,6 +613,7 @@ function AddProductForm({
   };
 
   const selectedCatName = categories.find((c) => c._id === form.category)?.name ?? "";
+  const isUploading = uploadItems.some((i) => i.status === "uploading");
 
   return (
     <div className="ap-form-outer">
@@ -567,42 +750,34 @@ function AddProductForm({
                     />
                   </div>
 
-                  <div /> {/* spacer */}
+                  <div />
 
                   <PillGroup
                     label="Shape"
                     options={SHAPES}
                     selected={(diamondForm as DiamondForm).shapes}
-                    onChange={(v) =>
-                      setDiamondForm((prev) => ({ ...prev, shapes: v }))
-                    }
+                    onChange={(v) => setDiamondForm((prev) => ({ ...prev, shapes: v }))}
                     required
                   />
                   <PillGroup
                     label="Color Grade"
                     options={COLORS}
                     selected={(diamondForm as DiamondForm).colors}
-                    onChange={(v) =>
-                      setDiamondForm((prev) => ({ ...prev, colors: v }))
-                    }
+                    onChange={(v) => setDiamondForm((prev) => ({ ...prev, colors: v }))}
                     required
                   />
                   <PillGroup
                     label="Clarity Grade"
                     options={CLARITIES}
                     selected={(diamondForm as DiamondForm).clarities}
-                    onChange={(v) =>
-                      setDiamondForm((prev) => ({ ...prev, clarities: v }))
-                    }
+                    onChange={(v) => setDiamondForm((prev) => ({ ...prev, clarities: v }))}
                     required
                   />
                   <PillGroup
                     label="Certification"
                     options={CERTIFICATIONS}
                     selected={(diamondForm as DiamondForm).certifications}
-                    onChange={(v) =>
-                      setDiamondForm((prev) => ({ ...prev, certifications: v }))
-                    }
+                    onChange={(v) => setDiamondForm((prev) => ({ ...prev, certifications: v }))}
                   />
                 </>
               )}
@@ -610,21 +785,16 @@ function AddProductForm({
               {/* ── Watch-specific fields ── */}
               {productType === "watch" && (
                 <>
-                  {/* Row 1: Gender + Brand */}
                   <div>
                     <label className="ap-label">Gender *</label>
                     <select
                       className="ap-input"
                       value={(watchForm as WatchForm).watchGender}
-                      onChange={(e) =>
-                        setWatchForm((prev) => ({ ...prev, watchGender: e.target.value }))
-                      }
+                      onChange={(e) => setWatchForm((prev) => ({ ...prev, watchGender: e.target.value }))}
                       required
                     >
                       <option value="">Select gender…</option>
-                      {WATCH_GENDERS.map((g) => (
-                        <option key={g} value={g}>{g}</option>
-                      ))}
+                      {WATCH_GENDERS.map((g) => <option key={g} value={g}>{g}</option>)}
                     </select>
                   </div>
 
@@ -633,33 +803,24 @@ function AddProductForm({
                     <select
                       className="ap-input"
                       value={(watchForm as WatchForm).watchBrand}
-                      onChange={(e) =>
-                        setWatchForm((prev) => ({ ...prev, watchBrand: e.target.value }))
-                      }
+                      onChange={(e) => setWatchForm((prev) => ({ ...prev, watchBrand: e.target.value }))}
                       required
                     >
                       <option value="">Select brand…</option>
-                      {WATCH_BRANDS.map((b) => (
-                        <option key={b} value={b}>{b}</option>
-                      ))}
+                      {WATCH_BRANDS.map((b) => <option key={b} value={b}>{b}</option>)}
                     </select>
                   </div>
 
-                  {/* Row 2: Movement + Style */}
                   <div>
                     <label className="ap-label">Movement *</label>
                     <select
                       className="ap-input"
                       value={(watchForm as WatchForm).watchMovement}
-                      onChange={(e) =>
-                        setWatchForm((prev) => ({ ...prev, watchMovement: e.target.value }))
-                      }
+                      onChange={(e) => setWatchForm((prev) => ({ ...prev, watchMovement: e.target.value }))}
                       required
                     >
                       <option value="">Select movement…</option>
-                      {WATCH_MOVEMENTS.map((m) => (
-                        <option key={m} value={m}>{m}</option>
-                      ))}
+                      {WATCH_MOVEMENTS.map((m) => <option key={m} value={m}>{m}</option>)}
                     </select>
                   </div>
 
@@ -668,31 +829,22 @@ function AddProductForm({
                     <select
                       className="ap-input"
                       value={(watchForm as WatchForm).watchStyle}
-                      onChange={(e) =>
-                        setWatchForm((prev) => ({ ...prev, watchStyle: e.target.value }))
-                      }
+                      onChange={(e) => setWatchForm((prev) => ({ ...prev, watchStyle: e.target.value }))}
                     >
                       <option value="">Select style…</option>
-                      {WATCH_STYLES.map((s) => (
-                        <option key={s} value={s}>{s}</option>
-                      ))}
+                      {WATCH_STYLES.map((s) => <option key={s} value={s}>{s}</option>)}
                     </select>
                   </div>
 
-                  {/* Row 3: Strap + Case Material */}
                   <div>
                     <label className="ap-label">Strap Type</label>
                     <select
                       className="ap-input"
                       value={(watchForm as WatchForm).watchStrapType}
-                      onChange={(e) =>
-                        setWatchForm((prev) => ({ ...prev, watchStrapType: e.target.value }))
-                      }
+                      onChange={(e) => setWatchForm((prev) => ({ ...prev, watchStrapType: e.target.value }))}
                     >
                       <option value="">Select strap…</option>
-                      {WATCH_STRAP_TYPES.map((s) => (
-                        <option key={s} value={s}>{s}</option>
-                      ))}
+                      {WATCH_STRAP_TYPES.map((s) => <option key={s} value={s}>{s}</option>)}
                     </select>
                   </div>
 
@@ -701,31 +853,22 @@ function AddProductForm({
                     <select
                       className="ap-input"
                       value={(watchForm as WatchForm).watchCaseMaterial}
-                      onChange={(e) =>
-                        setWatchForm((prev) => ({ ...prev, watchCaseMaterial: e.target.value }))
-                      }
+                      onChange={(e) => setWatchForm((prev) => ({ ...prev, watchCaseMaterial: e.target.value }))}
                     >
                       <option value="">Select material…</option>
-                      {WATCH_CASE_MATERIALS.map((m) => (
-                        <option key={m} value={m}>{m}</option>
-                      ))}
+                      {WATCH_CASE_MATERIALS.map((m) => <option key={m} value={m}>{m}</option>)}
                     </select>
                   </div>
 
-                  {/* Row 4: Dial Color + Case Size */}
                   <div>
                     <label className="ap-label">Dial Color</label>
                     <select
                       className="ap-input"
                       value={(watchForm as WatchForm).watchDialColor}
-                      onChange={(e) =>
-                        setWatchForm((prev) => ({ ...prev, watchDialColor: e.target.value }))
-                      }
+                      onChange={(e) => setWatchForm((prev) => ({ ...prev, watchDialColor: e.target.value }))}
                     >
                       <option value="">Select dial color…</option>
-                      {WATCH_DIAL_COLORS.map((c) => (
-                        <option key={c} value={c}>{c}</option>
-                      ))}
+                      {WATCH_DIAL_COLORS.map((c) => <option key={c} value={c}>{c}</option>)}
                     </select>
                   </div>
 
@@ -734,43 +877,30 @@ function AddProductForm({
                     <select
                       className="ap-input"
                       value={(watchForm as WatchForm).watchCaseSize}
-                      onChange={(e) =>
-                        setWatchForm((prev) => ({ ...prev, watchCaseSize: e.target.value }))
-                      }
+                      onChange={(e) => setWatchForm((prev) => ({ ...prev, watchCaseSize: e.target.value }))}
                     >
                       <option value="">Select size…</option>
-                      {WATCH_CASE_SIZES.map((s) => (
-                        <option key={s} value={s}>{s}</option>
-                      ))}
+                      {WATCH_CASE_SIZES.map((s) => <option key={s} value={s}>{s}</option>)}
                     </select>
                   </div>
 
-                  {/* Features pill group */}
                   <PillGroup
                     label="Features"
                     options={WATCH_FEATURES}
                     selected={(watchForm as WatchForm).watchFeatures}
-                    onChange={(v) =>
-                      setWatchForm((prev) => ({ ...prev, watchFeatures: v }))
-                    }
+                    onChange={(v) => setWatchForm((prev) => ({ ...prev, watchFeatures: v }))}
                   />
                 </>
               )}
 
-              {/* ── Shared bottom fields ── */}
-              <div className="ap-col-2">
-                <label className="ap-label">
-                  Image URLs <span className="ap-label-hint">one per line</span>
-                </label>
-                <textarea
-                  className="ap-input ap-textarea"
-                  rows={3}
-                  value={form.images}
-                  onChange={(e) => setField("images", e.target.value)}
-                  placeholder="https://cdn.example.com/product-1.jpg"
-                />
-              </div>
+              {/* ── Image uploader (replaces textarea) ── */}
+              <ImageUploader
+                items={uploadItems}
+                onChange={setUploadItems}
+                apiFetch={apiFetch}
+              />
 
+              {/* ── Description ── */}
               <div className="ap-col-2">
                 <label className="ap-label">Description</label>
                 <textarea
@@ -795,15 +925,17 @@ function AddProductForm({
                 </button>
                 <button
                   type="submit"
-                  disabled={loading}
+                  disabled={loading || isUploading}
                   className="ap-btn-primary full"
                   style={{ flex: 1 }}
                 >
-                  {loading
-                    ? "Saving…"
-                    : productType === "diamond"
-                      ? "💎 Create Diamond Product"
-                      : "⌚ Create Watch Product"}
+                  {isUploading
+                    ? "⏳ Uploading images…"
+                    : loading
+                      ? "Saving…"
+                      : productType === "diamond"
+                        ? "💎 Create Diamond Product"
+                        : "⌚ Create Watch Product"}
                 </button>
               </div>
             </div>
@@ -955,8 +1087,6 @@ export default function AdminProductsPage() {
   const hasFilters = !!(search || filterCategory || filterStatus !== "all" || filterShape || filterClarity);
   const activeCount = products.filter((p) => p.isActive).length;
   const totalValue = products.reduce((s, p) => s + p.price * p.stock, 0);
-
-  // Detect if a product is a watch (has watchBrand or watchMovement) vs diamond
   const isWatch = (p: Product) => !!(p.watchBrand || p.watchMovement || p.watchGender);
 
   return (
@@ -1018,7 +1148,6 @@ export default function AdminProductsPage() {
       {success && <div className="ap-success">✓ {success}</div>}
       {error && !showForm && <div className="ap-error">⚠ {error}</div>}
 
-      {/* Add Product Form */}
       {showForm && (
         <AddProductForm
           categories={categories}
