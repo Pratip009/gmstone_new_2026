@@ -19,6 +19,17 @@ export interface IShippingAddress {
   phone?: string;
 }
 
+// ─── NEW: FedEx shipment data ─────────────────────────────────────────────────
+export interface IFedExShipment {
+  trackingNumber: string;
+  labelBase64: string;   // base64-encoded PDF label
+  labelFormat: string;
+  shipmentId: string;
+  serviceType: string;
+  estimatedDelivery?: string;
+  createdAt: Date;
+}
+
 export interface IOrder extends Document {
   _id: mongoose.Types.ObjectId;
   user: mongoose.Types.ObjectId;
@@ -35,6 +46,8 @@ export interface IOrder extends Document {
   paypalPaymentId?: string;
   paypalPayerId?: string;
   notes?: string;
+  // ─── NEW ───────────────────────────────────────────────────────────────────
+  fedex?: IFedExShipment;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -60,6 +73,20 @@ const ShippingAddressSchema = new Schema<IShippingAddress>(
     postalCode: { type: String, required: true },
     country: { type: String, required: true },
     phone: String,
+  },
+  { _id: false }
+);
+
+// ─── NEW: FedEx sub-schema ────────────────────────────────────────────────────
+const FedExShipmentSchema = new Schema<IFedExShipment>(
+  {
+    trackingNumber: { type: String, required: true },
+    labelBase64: { type: String, required: true },
+    labelFormat: { type: String, default: 'PDF' },
+    shipmentId: { type: String, required: true },
+    serviceType: { type: String, required: true },
+    estimatedDelivery: String,
+    createdAt: { type: Date, default: Date.now },
   },
   { _id: false }
 );
@@ -92,6 +119,8 @@ const OrderSchema = new Schema<IOrder>(
     paypalPaymentId: String,
     paypalPayerId: String,
     notes: String,
+    // ─── NEW ─────────────────────────────────────────────────────────────────
+    fedex: { type: FedExShipmentSchema, default: undefined },
   },
   { timestamps: true }
 );
@@ -100,6 +129,8 @@ OrderSchema.index({ user: 1, createdAt: -1 });
 OrderSchema.index({ status: 1 });
 OrderSchema.index({ paypalOrderId: 1 });
 OrderSchema.index({ createdAt: -1 });
+// ─── NEW index for tracking lookups ──────────────────────────────────────────
+OrderSchema.index({ 'fedex.trackingNumber': 1 });
 
 const Order = (() => {
   if (mongoose.models && mongoose.models.Order) {
