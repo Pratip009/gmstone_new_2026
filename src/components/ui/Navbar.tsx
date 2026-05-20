@@ -355,6 +355,8 @@ export default function Navbar({ initialCategories = [] }: { initialCategories?:
           <div className="hidden md:flex flex-col items-end gap-1.5" style={{ flexShrink: 0 }}>
             <div style={{ display: "flex", alignItems: "center", gap: "2px" }}>
               <a href="/" className="nav-toplink">Home</a>
+              <a href="/about" className="nav-toplink">About</a>
+              <a href="/contact" className="nav-toplink">Contact Us</a>
 
               {user ? (
                 <>
