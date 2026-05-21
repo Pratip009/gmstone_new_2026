@@ -28,16 +28,17 @@ interface ShippingAddress {
   phone?: string;
 }
 
-interface FedExShipment {
+interface CarrierShipment {
   trackingNumber: string;
   serviceType: string;
   estimatedDelivery?: string;
   createdAt: string;
+  carrier: 'FedEx' | 'USPS' | 'UPS';
 }
 
 interface TrackingEvent {
   timestamp: string;
-  eventType: string;
+  eventType?: string;
   description: string;
   location?: string;
 }
@@ -63,7 +64,13 @@ interface Order {
   paymentMethod: string;
   paymentStatus: string;
   createdAt: string;
-  fedex?: FedExShipment;
+  // carrier shipments
+  fedex?: CarrierShipment;
+  usps?: CarrierShipment;
+  ups?: CarrierShipment;
+  // unified tracking number (whichever carrier was used)
+  trackingNumber?: string;
+  shippingCarrier?: 'FedEx' | 'USPS' | 'UPS';
 }
 
 interface Pagination {
@@ -86,12 +93,45 @@ const STATUS_CONFIG: Record<string, {
   refunded:   { label: 'Refunded',   bg: '#f5f5f5', text: '#5a5a5a', border: '#b0b0b0', icon: RefreshCw },
 };
 
-const FEDEX_STATUS_COLOR: Record<string, string> = {
-  OD: 'text-blue-600',
-  DL: 'text-green-600',
-  IT: 'text-yellow-600',
-  PU: 'text-purple-600',
-};
+// Carrier visual identity
+const CARRIER_CONFIG = {
+  FedEx: {
+    color: '#4D148C',
+    accent: '#FF6600',
+    bg: '#f8f4ff',
+    border: '#d4b8f0',
+    text: '#4D148C',
+    badgeBg: '#f3eefb',
+    badgeText: '#5a2d8b',
+    badgeBorder: '#b090d4',
+    apiPrefix: 'fedex',
+    labelRoute: 'fedex-label',
+  },
+  USPS: {
+    color: '#333366',
+    accent: '#CC0000',
+    bg: '#fff0f0',
+    border: '#f0b8b8',
+    text: '#333366',
+    badgeBg: '#fff0f0',
+    badgeText: '#9e2d2d',
+    badgeBorder: '#d48080',
+    apiPrefix: 'usps',
+    labelRoute: 'usps-label',
+  },
+  UPS: {
+    color: '#351C15',
+    accent: '#FFB500',
+    bg: '#fffbf0',
+    border: '#f0d880',
+    text: '#351C15',
+    badgeBg: '#fffbf0',
+    badgeText: '#7a5a00',
+    badgeBorder: '#d4b800',
+    apiPrefix: 'ups',
+    labelRoute: 'ups-label',
+  },
+} as const;
 
 const ALL_STATUSES = ['pending', 'paid', 'processing', 'shipped', 'delivered', 'cancelled', 'refunded'];
 
@@ -104,7 +144,7 @@ function timeAgo(iso: string) {
   return new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
 }
 
-// ─── Invoice Modal (unchanged) ────────────────────────────────────────────────
+// ─── Invoice Modal ────────────────────────────────────────────────────────────
 function Invoice({ order, onClose }: { order: Order; onClose: () => void }) {
   const invoiceRef = useRef<HTMLDivElement>(null);
   const invoiceNumber = `INV-${order._id.slice(-8).toUpperCase()}`;
@@ -122,40 +162,26 @@ function Invoice({ order, onClose }: { order: Order; onClose: () => void }) {
     win.document.write(`<!DOCTYPE html><html><head>
       <title>${invoiceNumber}</title>
       <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;1,400&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
-      <style>
-        *{box-sizing:border-box;margin:0;padding:0;}
-        body{font-family:'DM Sans',sans-serif;background:#fff;color:#1a1714;-webkit-print-color-adjust:exact;print-color-adjust:exact;}
-        @page{margin:0;size:A4;}
-      </style>
+      <style>*{box-sizing:border-box;margin:0;padding:0;}body{font-family:'DM Sans',sans-serif;background:#fff;color:#1a1714;-webkit-print-color-adjust:exact;print-color-adjust:exact;}@page{margin:0;size:A4;}</style>
     </head><body>${content}</body></html>`);
     win.document.close();
     win.focus();
     setTimeout(() => { win.print(); win.close(); }, 500);
   };
 
-  const handleBackdrop = (e: React.MouseEvent<HTMLDivElement>) => {
-    if (e.target === e.currentTarget) onClose();
-  };
-
   return (
     <div
       className="fixed inset-0 z-50 flex items-start justify-center bg-black/60 backdrop-blur-sm overflow-y-auto py-8 px-4"
-      onClick={handleBackdrop}
+      onClick={e => { if (e.target === e.currentTarget) onClose(); }}
     >
       <div className="w-full max-w-3xl">
         <div className="flex items-center justify-between mb-4 px-1">
           <p className="text-white/60 text-sm font-mono">{invoiceNumber}</p>
           <div className="flex items-center gap-2">
-            <button
-              onClick={handlePrint}
-              className="flex items-center gap-2 px-4 py-2 bg-[#c9a84c] text-white text-sm font-medium rounded-lg hover:bg-[#b8963e] transition-colors"
-            >
+            <button onClick={handlePrint} className="flex items-center gap-2 px-4 py-2 bg-[#c9a84c] text-white text-sm font-medium rounded-lg hover:bg-[#b8963e] transition-colors">
               <Printer size={14} /> Print / Save PDF
             </button>
-            <button
-              onClick={onClose}
-              className="w-9 h-9 flex items-center justify-center bg-white/10 hover:bg-white/20 rounded-lg transition-colors"
-            >
+            <button onClick={onClose} className="w-9 h-9 flex items-center justify-center bg-white/10 hover:bg-white/20 rounded-lg transition-colors">
               <X size={16} className="text-white" />
             </button>
           </div>
@@ -166,23 +192,16 @@ function Invoice({ order, onClose }: { order: Order; onClose: () => void }) {
               <div style={{ fontFamily: "'Cormorant Garamond', serif", fontSize: 30, fontWeight: 500, color: '#1a1714', letterSpacing: '-0.5px', lineHeight: 1 }}>
                 Alpha<span style={{ color: '#c9a84c' }}>Imports</span>
               </div>
-              <div style={{ fontSize: 9, color: '#a09a90', marginTop: 6, letterSpacing: '0.18em', textTransform: 'uppercase' }}>
-                Fine Gemstones & Jewellery
-              </div>
+              <div style={{ fontSize: 9, color: '#a09a90', marginTop: 6, letterSpacing: '0.18em', textTransform: 'uppercase' }}>Fine Gemstones & Jewellery</div>
               <div style={{ marginTop: 18, fontSize: 12, color: '#6b6560', lineHeight: 1.8 }}>
-                <div>123 Gem Street, Suite 4</div>
-                <div>New York, NY 10001, United States</div>
+                <div>123 Gem Street, Suite 4</div><div>New York, NY 10001, United States</div>
                 <div style={{ color: '#c9a84c', marginTop: 2 }}>admin@alphaimports.com</div>
               </div>
             </div>
             <div style={{ textAlign: 'right' }}>
               <div style={{ fontFamily: "'Cormorant Garamond', serif", fontSize: 46, fontWeight: 300, color: '#1a1714', letterSpacing: '-2px', lineHeight: 1 }}>INVOICE</div>
               <div style={{ marginTop: 14 }}>
-                {[
-                  { label: 'Invoice No.', value: invoiceNumber, mono: true },
-                  { label: 'Date', value: invoiceDate },
-                  { label: 'Due Date', value: dueDate },
-                ].map(({ label, value, mono }) => (
+                {[{ label: 'Invoice No.', value: invoiceNumber, mono: true }, { label: 'Date', value: invoiceDate }, { label: 'Due Date', value: dueDate }].map(({ label, value, mono }) => (
                   <div key={label} style={{ display: 'flex', justifyContent: 'flex-end', gap: 20, marginBottom: 5, fontSize: 12 }}>
                     <span style={{ color: '#c4bdb2' }}>{label}</span>
                     <span style={{ fontWeight: 500, color: '#1a1714', fontFamily: mono ? 'monospace' : 'inherit' }}>{value}</span>
@@ -213,8 +232,8 @@ function Invoice({ order, onClose }: { order: Order; onClose: () => void }) {
           <table style={{ width: '100%', borderCollapse: 'collapse', marginBottom: 28 }}>
             <thead>
               <tr style={{ background: '#1a1714' }}>
-                {[{ label: 'Item Description', align: 'left' }, { label: 'SKU', align: 'left' }, { label: 'Unit Price', align: 'right' }, { label: 'Qty', align: 'right' }, { label: 'Amount', align: 'right' }].map(({ label, align }) => (
-                  <th key={label} style={{ padding: '11px 14px', fontSize: 9, fontWeight: 600, letterSpacing: '0.15em', textTransform: 'uppercase', color: '#f0e8d0', textAlign: align as 'left' | 'right' }}>{label}</th>
+                {['Item Description', 'SKU', 'Unit Price', 'Qty', 'Amount'].map((label, i) => (
+                  <th key={label} style={{ padding: '11px 14px', fontSize: 9, fontWeight: 600, letterSpacing: '0.15em', textTransform: 'uppercase', color: '#f0e8d0', textAlign: i === 0 || i === 1 ? 'left' : 'right' }}>{label}</th>
                 ))}
               </tr>
             </thead>
@@ -271,8 +290,7 @@ function StatusBadge({ status }: { status: string }) {
   const Icon = cfg.icon;
   return (
     <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[0.62rem] font-semibold tracking-wide" style={{ background: cfg.bg, color: cfg.text, border: `1px solid ${cfg.border}` }}>
-      <Icon size={9} strokeWidth={2.5} />
-      {cfg.label}
+      <Icon size={9} strokeWidth={2.5} />{cfg.label}
     </span>
   );
 }
@@ -303,27 +321,30 @@ function StatusSelect({ orderId, current, onUpdate }: {
 
   const cfg = STATUS_CONFIG[current] ?? { bg: '#f5f5f5', text: '#555', border: '#ccc' };
   return (
-    <select
-      value={current}
-      onChange={handleChange}
-      disabled={updating}
+    <select value={current} onChange={handleChange} disabled={updating}
       className="text-[0.68rem] font-semibold rounded-full px-2.5 py-1 outline-none cursor-pointer disabled:opacity-50 transition-all"
-      style={{ background: cfg.bg, color: cfg.text, border: `1px solid ${cfg.border}` }}
-    >
-      {ALL_STATUSES.map(s => (
-        <option key={s} value={s}>{STATUS_CONFIG[s]?.label ?? s}</option>
-      ))}
+      style={{ background: cfg.bg, color: cfg.text, border: `1px solid ${cfg.border}` }}>
+      {ALL_STATUSES.map(s => <option key={s} value={s}>{STATUS_CONFIG[s]?.label ?? s}</option>)}
     </select>
   );
 }
 
-// ─── FedEx Panel (NEW) ────────────────────────────────────────────────────────
-function FedExPanel({ order, onLabelGenerated }: {
+// ─── Generic Carrier Shipping Panel ──────────────────────────────────────────
+function CarrierPanel({
+  carrier,
+  order,
+  onLabelGenerated,
+}: {
+  carrier: 'FedEx' | 'USPS' | 'UPS';
   order: Order;
-  onLabelGenerated: (orderId: string, fedex: FedExShipment) => void;
+  onLabelGenerated: (orderId: string, carrier: 'FedEx' | 'USPS' | 'UPS', shipment: CarrierShipment) => void;
 }) {
   const authFetch = useAuthFetch();
-  const [fedex, setFedex] = useState<FedExShipment | undefined>(order.fedex);
+  const cfg = CARRIER_CONFIG[carrier];
+
+  // shipment stored per-carrier key on the order object
+  const carrierKey = carrier.toLowerCase() as 'fedex' | 'usps' | 'ups';
+  const [shipment, setShipment] = useState<CarrierShipment | undefined>(order[carrierKey] as CarrierShipment | undefined);
   const [tracking, setTracking] = useState<TrackingData | null>(null);
   const [labelLoading, setLabelLoading] = useState(false);
   const [trackLoading, setTrackLoading] = useState(false);
@@ -336,12 +357,13 @@ function FedExPanel({ order, onLabelGenerated }: {
     setLabelLoading(true);
     setError(null);
     try {
-      const res = await authFetch(`/api/admin/orders/${order._id}/fedex-label`, { method: 'POST' });
+      const res = await authFetch(`/api/admin/orders/${order._id}/${cfg.labelRoute}`, { method: 'POST' });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.message ?? 'Failed to generate label');
-      const newFedex = data.data?.order?.fedex as FedExShipment;
-      setFedex(newFedex);
-      onLabelGenerated(order._id, newFedex);
+      if (!res.ok) throw new Error(data.message ?? `Failed to generate ${carrier} label`);
+      // API returns the updated order; pick the carrier-specific shipment
+      const newShipment = (data.data?.order?.[carrierKey] ?? data.data?.[carrierKey]) as CarrierShipment;
+      setShipment(newShipment);
+      onLabelGenerated(order._id, carrier, newShipment);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Unknown error');
     } finally {
@@ -354,7 +376,11 @@ function FedExPanel({ order, onLabelGenerated }: {
     setTrackLoading(true);
     setError(null);
     try {
-      const res = await authFetch(`/api/orders/${order._id}/tracking`);
+      const res = await authFetch(`/api/shipping/track`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ trackingNumber: shipment!.trackingNumber, carrier: cfg.apiPrefix }),
+      });
       const data = await res.json();
       if (!res.ok) throw new Error(data.message ?? 'Failed to fetch tracking');
       setTracking(data.data);
@@ -367,20 +393,32 @@ function FedExPanel({ order, onLabelGenerated }: {
   }
 
   function handlePrint() {
-    window.open(`/api/admin/orders/${order._id}/fedex-label/download`, '_blank');
+    window.open(`/api/admin/orders/${order._id}/${cfg.labelRoute}/download`, '_blank');
   }
 
   return (
-    <div className="rounded-xl border border-[#ede9e1] bg-white p-4 space-y-3">
-
+    <div
+      className="rounded-xl p-4 space-y-3"
+      style={{ background: cfg.bg, border: `1px solid ${cfg.border}` }}
+    >
       {/* Header */}
       <div className="flex items-center justify-between">
-        <div className="flex items-center gap-1.5">
-          <Truck size={13} className="text-[#c9a84c]" />
-          <span className="text-[0.65rem] font-semibold uppercase tracking-widest text-[#a09a90]">FedEx Shipping</span>
+        <div className="flex items-center gap-2">
+          <div
+            className="w-5 h-5 rounded flex items-center justify-center"
+            style={{ background: cfg.color }}
+          >
+            <Truck size={10} style={{ color: cfg.accent }} />
+          </div>
+          <span
+            className="text-[0.65rem] font-bold uppercase tracking-widest"
+            style={{ color: cfg.color }}
+          >
+            {carrier}
+          </span>
         </div>
-        {fedex && (
-          <span className="text-[0.6rem] font-mono text-[#a09a90]">{fedex.trackingNumber}</span>
+        {shipment && (
+          <span className="text-[0.6rem] font-mono text-[#a09a90]">{shipment.trackingNumber}</span>
         )}
       </div>
 
@@ -392,50 +430,50 @@ function FedExPanel({ order, onLabelGenerated }: {
         </div>
       )}
 
-      {/* Label info */}
-      {fedex ? (
+      {/* Shipment info */}
+      {shipment ? (
         <div className="grid grid-cols-2 gap-x-4 gap-y-1.5 text-[0.68rem]">
           <span className="text-[#a09a90]">Service</span>
-          <span className="text-[#1a1714] font-medium">{fedex.serviceType.replace(/_/g, ' ')}</span>
-          {fedex.estimatedDelivery && (
+          <span className="font-medium text-[#1a1714]">{shipment.serviceType.replace(/_/g, ' ')}</span>
+          {shipment.estimatedDelivery && (
             <>
               <span className="text-[#a09a90]">Est. Delivery</span>
-              <span className="text-[#1a1714] font-medium">{new Date(fedex.estimatedDelivery).toLocaleDateString()}</span>
+              <span className="font-medium text-[#1a1714]">{new Date(shipment.estimatedDelivery).toLocaleDateString()}</span>
             </>
           )}
           <span className="text-[#a09a90]">Label Created</span>
-          <span className="text-[#1a1714]">{new Date(fedex.createdAt).toLocaleString()}</span>
+          <span className="text-[#1a1714]">{new Date(shipment.createdAt).toLocaleString()}</span>
         </div>
       ) : (
         <p className="text-[0.68rem] text-[#c4bdb2] italic">
-          {isPaid ? 'No label yet — generate one below.' : 'Available after payment is completed.'}
+          {isPaid ? `No ${carrier} label yet — generate one below.` : 'Available after payment is completed.'}
         </p>
       )}
 
-      {/* Actions */}
+      {/* Action buttons */}
       <div className="flex flex-wrap gap-2 pt-1">
         <button
           onClick={handleGenerate}
           disabled={labelLoading || !isPaid}
-          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[0.68rem] font-semibold bg-[#1a1714] text-[#f0e8d0] hover:bg-[#2a2720] disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[0.68rem] font-semibold text-white disabled:opacity-40 disabled:cursor-not-allowed transition-all hover:opacity-90"
+          style={{ background: cfg.color }}
         >
           <Package size={11} />
-          {labelLoading ? 'Generating…' : fedex ? 'Regenerate Label' : 'Generate Label'}
+          {labelLoading ? 'Generating…' : shipment ? 'Regenerate' : 'Generate Label'}
         </button>
 
-        {fedex && (
+        {shipment && (
           <>
             <button
               onClick={handlePrint}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[0.68rem] font-semibold border border-[#ede9e1] text-[#6b6560] hover:bg-[#faf9f7] transition-colors"
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[0.68rem] font-semibold border border-[#ede9e1] text-[#6b6560] hover:bg-white transition-colors"
             >
-              <Printer size={11} />
-              Print Label
+              <Printer size={11} /> Print Label
             </button>
             <button
               onClick={handleTrack}
               disabled={trackLoading}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[0.68rem] font-semibold border border-[#ede9e1] text-[#6b6560] hover:bg-[#faf9f7] disabled:opacity-40 transition-colors"
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[0.68rem] font-semibold border border-[#ede9e1] text-[#6b6560] hover:bg-white disabled:opacity-40 transition-colors"
             >
               <MapPin size={11} />
               {trackLoading ? 'Loading…' : trackOpen ? 'Hide Tracking' : 'Live Tracking'}
@@ -446,10 +484,10 @@ function FedExPanel({ order, onLabelGenerated }: {
 
       {/* Live tracking timeline */}
       {trackOpen && tracking && (
-        <div className="pt-3 border-t border-[#f0ece6] space-y-3">
+        <div className="pt-3 border-t border-[#ede9e1] space-y-3">
           <div className="flex items-center justify-between">
-            <span className={`text-[0.72rem] font-semibold ${FEDEX_STATUS_COLOR[tracking.status] ?? 'text-[#1a1714]'}`}>
-              {tracking.statusDescription}
+            <span className="text-[0.72rem] font-semibold text-[#1a1714]">
+              {tracking.statusDescription || tracking.status}
             </span>
             {(tracking.estimatedDelivery || tracking.actualDelivery) && (
               <span className="text-[0.62rem] text-[#a09a90]">
@@ -463,7 +501,10 @@ function FedExPanel({ order, onLabelGenerated }: {
             <ol className="relative border-l border-[#ede9e1] space-y-3 ml-2">
               {tracking.events.slice(0, 6).map((ev, i) => (
                 <li key={i} className="ml-3.5">
-                  <div className="absolute -left-1.5 mt-1 h-2.5 w-2.5 rounded-full border-2 border-white bg-[#c9a84c]" />
+                  <div
+                    className="absolute -left-1.5 mt-1 h-2.5 w-2.5 rounded-full border-2 border-white"
+                    style={{ background: cfg.accent }}
+                  />
                   <p className="text-[0.6rem] text-[#a09a90]">
                     {new Date(ev.timestamp).toLocaleString()}{ev.location && ` · ${ev.location}`}
                   </p>
@@ -478,61 +519,99 @@ function FedExPanel({ order, onLabelGenerated }: {
   );
 }
 
-// ─── Expanded Order Detail (updated with FedEx panel) ─────────────────────────
+// ─── Shipping Indicator for table row ─────────────────────────────────────────
+function ShippingIndicator({ order }: { order: Order }) {
+  const hasAny = order.fedex || order.usps || order.ups;
+
+  if (!hasAny && order.paymentStatus !== 'completed') {
+    return <span className="text-[0.6rem] text-[#c4bdb2]">—</span>;
+  }
+
+  if (!hasAny) {
+    return (
+      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[0.6rem] font-semibold" style={{ background: '#fdf5e6', color: '#8b5e1a', border: '1px solid #e0c070' }}>
+        <Package size={8} /> Pending
+      </span>
+    );
+  }
+
+  // Show badges for each carrier that has a label
+  const carriers = (['fedex', 'usps', 'ups'] as const).filter(c => order[c]);
+  return (
+    <div className="flex flex-wrap gap-1">
+      {carriers.map(c => {
+        const carrier = c.toUpperCase() as 'FEDEX' | 'USPS' | 'UPS';
+        const key = carrier === 'FEDEX' ? 'FedEx' : carrier as 'USPS' | 'UPS';
+        const carrierCfg = CARRIER_CONFIG[key === 'FEDEX' ? 'FedEx' : key as 'USPS' | 'UPS'];
+        return (
+          <span key={c} className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-[0.58rem] font-bold"
+            style={{ background: carrierCfg.badgeBg, color: carrierCfg.badgeText, border: `1px solid ${carrierCfg.badgeBorder}` }}>
+            <Truck size={7} />{key}
+          </span>
+        );
+      })}
+    </div>
+  );
+}
+
+// ─── Expanded Order Detail ────────────────────────────────────────────────────
 function OrderDetail({ order, onLabelGenerated }: {
   order: Order;
-  onLabelGenerated: (orderId: string, fedex: FedExShipment) => void;
+  onLabelGenerated: (orderId: string, carrier: 'FedEx' | 'USPS' | 'UPS', shipment: CarrierShipment) => void;
 }) {
   return (
-    <div className="bg-[#faf9f7] border-t border-[#ede9e1] px-6 py-5 grid grid-cols-1 md:grid-cols-3 gap-5">
-
-      {/* Items */}
-      <div>
-        <p className="text-[0.62rem] tracking-widest uppercase text-[#a09a90] font-semibold mb-2">Items</p>
-        <div className="flex flex-col gap-2">
-          {order.items.map((item, i) => (
-            <div key={i} className="flex items-center gap-2.5">
-              <div className="w-8 h-8 rounded-lg bg-[#ede9e1] flex items-center justify-center text-sm flex-shrink-0">💎</div>
-              <div className="min-w-0 flex-1">
-                <p className="text-[0.75rem] font-medium text-[#1a1714] truncate">{item.name}</p>
-                <p className="text-[0.65rem] text-[#a09a90]">Qty {item.quantity} × ${item.price.toLocaleString()}</p>
+    <div className="bg-[#faf9f7] border-t border-[#ede9e1] px-6 py-5">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-5 mb-5">
+        {/* Items */}
+        <div>
+          <p className="text-[0.62rem] tracking-widest uppercase text-[#a09a90] font-semibold mb-2">Items</p>
+          <div className="flex flex-col gap-2">
+            {order.items.map((item, i) => (
+              <div key={i} className="flex items-center gap-2.5">
+                <div className="w-8 h-8 rounded-lg bg-[#ede9e1] flex items-center justify-center text-sm flex-shrink-0">💎</div>
+                <div className="min-w-0 flex-1">
+                  <p className="text-[0.75rem] font-medium text-[#1a1714] truncate">{item.name}</p>
+                  <p className="text-[0.65rem] text-[#a09a90]">Qty {item.quantity} × ${item.price.toLocaleString()}</p>
+                </div>
+                <p className="text-[0.75rem] font-semibold text-[#1a1714]">${(item.price * item.quantity).toLocaleString()}</p>
               </div>
-              <p className="text-[0.75rem] font-semibold text-[#1a1714]">${(item.price * item.quantity).toLocaleString()}</p>
-            </div>
-          ))}
+            ))}
+          </div>
+          <div className="mt-3 pt-3 border-t border-[#ede9e1] grid grid-cols-3 gap-2 text-center">
+            {[{ label: 'Subtotal', value: `$${order.subtotal.toLocaleString()}` }, { label: 'Tax', value: `$${order.tax.toFixed(2)}` }, { label: 'Total', value: `$${order.totalAmount.toLocaleString()}` }].map(({ label, value }) => (
+              <div key={label}>
+                <p className="text-[0.6rem] uppercase tracking-widest text-[#a09a90]">{label}</p>
+                <p className={`text-[0.8rem] font-semibold ${label === 'Total' ? 'text-[#c9a84c]' : 'text-[#1a1714]'}`}>{value}</p>
+              </div>
+            ))}
+          </div>
         </div>
-        {/* Totals */}
-        <div className="mt-3 pt-3 border-t border-[#ede9e1] grid grid-cols-3 gap-2 text-center">
-          {[
-            { label: 'Subtotal', value: `$${order.subtotal.toLocaleString()}` },
-            { label: 'Tax', value: `$${order.tax.toFixed(2)}` },
-            { label: 'Total', value: `$${order.totalAmount.toLocaleString()}` },
-          ].map(({ label, value }) => (
-            <div key={label}>
-              <p className="text-[0.6rem] uppercase tracking-widest text-[#a09a90]">{label}</p>
-              <p className={`text-[0.8rem] font-semibold ${label === 'Total' ? 'text-[#c9a84c]' : 'text-[#1a1714]'}`}>{value}</p>
-            </div>
-          ))}
+
+        {/* Ship to */}
+        <div>
+          <p className="text-[0.62rem] tracking-widest uppercase text-[#a09a90] font-semibold mb-2">Ship To</p>
+          <div className="text-[0.75rem] text-[#5a5249] leading-relaxed">
+            <p className="font-medium text-[#1a1714]">{order.shippingAddress.fullName}</p>
+            <p>{order.shippingAddress.addressLine1}</p>
+            {order.shippingAddress.addressLine2 && <p>{order.shippingAddress.addressLine2}</p>}
+            <p>{order.shippingAddress.city}, {order.shippingAddress.state} {order.shippingAddress.postalCode}</p>
+            <p>{order.shippingAddress.country}</p>
+            {order.shippingAddress.phone && <p className="mt-1 text-[#a09a90]">{order.shippingAddress.phone}</p>}
+          </div>
         </div>
       </div>
 
-      {/* Shipping address */}
+      {/* ── Three carrier panels side by side ── */}
       <div>
-        <p className="text-[0.62rem] tracking-widest uppercase text-[#a09a90] font-semibold mb-2">Ship To</p>
-        <div className="text-[0.75rem] text-[#5a5249] leading-relaxed">
-          <p className="font-medium text-[#1a1714]">{order.shippingAddress.fullName}</p>
-          <p>{order.shippingAddress.addressLine1}</p>
-          {order.shippingAddress.addressLine2 && <p>{order.shippingAddress.addressLine2}</p>}
-          <p>{order.shippingAddress.city}, {order.shippingAddress.state} {order.shippingAddress.postalCode}</p>
-          <p>{order.shippingAddress.country}</p>
-          {order.shippingAddress.phone && (
-            <p className="mt-1 text-[#a09a90]">{order.shippingAddress.phone}</p>
-          )}
+        <p className="text-[0.62rem] tracking-widest uppercase text-[#a09a90] font-semibold mb-3">
+          Shipping Labels & Tracking
+        </p>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <CarrierPanel carrier="FedEx" order={order} onLabelGenerated={onLabelGenerated} />
+          <CarrierPanel carrier="USPS"  order={order} onLabelGenerated={onLabelGenerated} />
+          <CarrierPanel carrier="UPS"   order={order} onLabelGenerated={onLabelGenerated} />
         </div>
       </div>
-
-      {/* FedEx panel */}
-      <FedExPanel order={order} onLabelGenerated={onLabelGenerated} />
     </div>
   );
 }
@@ -559,10 +638,7 @@ export default function AdminOrdersPage() {
 
     authFetch(`/api/admin/orders?${params}`)
       .then(r => r.json())
-      .then(j => {
-        setOrders(j.data ?? []);
-        setPagination(j.pagination ?? null);
-      })
+      .then(j => { setOrders(j.data ?? []); setPagination(j.pagination ?? null); })
       .catch(e => console.error('[orders]', e))
       .finally(() => setLoading(false));
   }, [authLoading, token, page, statusFilter]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -571,9 +647,13 @@ export default function AdminOrdersPage() {
     setOrders(prev => prev.map(o => o._id === id ? { ...o, status: newStatus } : o));
   };
 
-  // When a FedEx label is generated/regenerated, update the order in state
-  const handleLabelGenerated = (orderId: string, fedex: FedExShipment) => {
-    setOrders(prev => prev.map(o => o._id === orderId ? { ...o, fedex, status: o.status === 'paid' ? 'processing' : o.status } : o));
+  const handleLabelGenerated = (orderId: string, carrier: 'FedEx' | 'USPS' | 'UPS', shipment: CarrierShipment) => {
+    const key = carrier.toLowerCase() as 'fedex' | 'usps' | 'ups';
+    setOrders(prev => prev.map(o =>
+      o._id === orderId
+        ? { ...o, [key]: shipment, status: o.status === 'paid' ? 'processing' : o.status }
+        : o
+    ));
   };
 
   const filtered = orders.filter(o =>
@@ -587,7 +667,6 @@ export default function AdminOrdersPage() {
 
   return (
     <div className="min-h-screen">
-
       {invoiceOrder && <Invoice order={invoiceOrder} onClose={() => setInvoiceOrder(null)} />}
 
       {/* Header */}
@@ -615,16 +694,13 @@ export default function AdminOrdersPage() {
           const active = statusFilter === value;
           const cfg = value ? STATUS_CONFIG[value] : null;
           return (
-            <button
-              key={value}
-              onClick={() => { setStatusFilter(value); setPage(1); }}
+            <button key={value} onClick={() => { setStatusFilter(value); setPage(1); }}
               className="px-3 py-1.5 rounded-full text-[0.68rem] font-semibold tracking-wide transition-all"
               style={
                 active && cfg ? { background: cfg.bg, color: cfg.text, border: `1px solid ${cfg.border}` }
                 : active ? { background: '#1a1714', color: '#f0e8d0', border: '1px solid #1a1714' }
                 : { background: '#fff', color: '#a09a90', border: '1px solid #ede9e1' }
-              }
-            >
+              }>
               {label}
             </button>
           );
@@ -633,7 +709,6 @@ export default function AdminOrdersPage() {
 
       {/* Table card */}
       <div className="bg-white border border-[#ede9e1] rounded-2xl overflow-hidden">
-
         {/* Toolbar */}
         <div className="flex items-center justify-between px-5 py-4 border-b border-[#ede9e1]">
           <p className="text-[0.72rem] text-[#a09a90]">
@@ -641,19 +716,14 @@ export default function AdminOrdersPage() {
           </p>
           <div className="relative">
             <Search size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-[#c4bdb2]" strokeWidth={2} />
-            <input
-              type="text"
-              placeholder="Search by ID or customer…"
-              value={search}
-              onChange={e => setSearch(e.target.value)}
-              className="pl-8 pr-3 py-2 text-[0.72rem] bg-[#faf9f7] border border-[#ede9e1] rounded-lg outline-none focus:border-[#c9a84c]/50 focus:ring-1 focus:ring-[#c9a84c]/20 transition-all w-52 placeholder:text-[#c4bdb2]"
-            />
+            <input type="text" placeholder="Search by ID or customer…" value={search} onChange={e => setSearch(e.target.value)}
+              className="pl-8 pr-3 py-2 text-[0.72rem] bg-[#faf9f7] border border-[#ede9e1] rounded-lg outline-none focus:border-[#c9a84c]/50 focus:ring-1 focus:ring-[#c9a84c]/20 transition-all w-52 placeholder:text-[#c4bdb2]" />
           </div>
         </div>
 
         {/* Column headers */}
-        <div className="grid grid-cols-[1.2fr_1.6fr_1fr_90px_90px_110px_160px] px-5 py-2.5 border-b border-[#ede9e1] bg-[#faf9f7]">
-          {['Order ID', 'Customer', 'Total', 'Payment', 'FedEx', 'Status', 'Date'].map(h => (
+        <div className="grid grid-cols-[1.2fr_1.6fr_1fr_90px_130px_110px_160px] px-5 py-2.5 border-b border-[#ede9e1] bg-[#faf9f7]">
+          {['Order ID', 'Customer', 'Total', 'Payment', 'Shipping', 'Status', 'Date'].map(h => (
             <span key={h} className="text-[0.6rem] tracking-[0.15em] uppercase text-[#b0a898] font-semibold">{h}</span>
           ))}
         </div>
@@ -662,8 +732,8 @@ export default function AdminOrdersPage() {
         <div>
           {loading ? (
             Array.from({ length: 8 }).map((_, i) => (
-              <div key={i} className="grid grid-cols-[1.2fr_1.6fr_1fr_90px_90px_110px_160px] px-5 py-4 border-b border-[#f5f3ef] animate-pulse">
-                {[120, 160, 80, 60, 70, 90, 80].map((w, j) => (
+              <div key={i} className="grid grid-cols-[1.2fr_1.6fr_1fr_90px_130px_110px_160px] px-5 py-4 border-b border-[#f5f3ef] animate-pulse">
+                {[120, 160, 80, 60, 90, 90, 80].map((w, j) => (
                   <div key={j} className="h-3 bg-[#ede9e1] rounded" style={{ width: w }} />
                 ))}
               </div>
@@ -677,7 +747,7 @@ export default function AdminOrdersPage() {
             filtered.map(order => (
               <div key={order._id}>
                 <div
-                  className="grid grid-cols-[1.2fr_1.6fr_1fr_90px_90px_110px_160px] px-5 py-3.5 border-b border-[#f5f3ef] hover:bg-[#faf9f7] transition-colors cursor-pointer items-center"
+                  className="grid grid-cols-[1.2fr_1.6fr_1fr_90px_130px_110px_160px] px-5 py-3.5 border-b border-[#f5f3ef] hover:bg-[#faf9f7] transition-colors cursor-pointer items-center"
                   onClick={() => setExpandedId(expandedId === order._id ? null : order._id)}
                 >
                   {/* Order ID */}
@@ -687,7 +757,8 @@ export default function AdminOrdersPage() {
 
                   {/* Customer */}
                   <div className="flex items-center gap-2 min-w-0 pr-2">
-                    <div className="w-6 h-6 rounded-full flex items-center justify-center text-[0.6rem] font-bold shrink-0" style={{ background: '#c9a84c20', color: '#c9a84c', border: '1px solid #c9a84c30' }}>
+                    <div className="w-6 h-6 rounded-full flex items-center justify-center text-[0.6rem] font-bold shrink-0"
+                      style={{ background: '#c9a84c20', color: '#c9a84c', border: '1px solid #c9a84c30' }}>
                       {order.user?.name?.charAt(0).toUpperCase() ?? '?'}
                     </div>
                     <div className="min-w-0">
@@ -704,24 +775,12 @@ export default function AdminOrdersPage() {
                     {order.paymentStatus}
                   </span>
 
-                  {/* FedEx indicator (NEW) */}
+                  {/* Shipping indicator (all 3 carriers) */}
                   <div onClick={e => e.stopPropagation()}>
-                    {order.fedex ? (
-                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[0.6rem] font-semibold" style={{ background: '#f3eefb', color: '#5a2d8b', border: '1px solid #b090d4' }}>
-                        <Truck size={8} />
-                        Labeled
-                      </span>
-                    ) : order.paymentStatus === 'completed' ? (
-                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[0.6rem] font-semibold" style={{ background: '#fdf5e6', color: '#8b5e1a', border: '1px solid #e0c070' }}>
-                        <Package size={8} />
-                        Pending
-                      </span>
-                    ) : (
-                      <span className="text-[0.6rem] text-[#c4bdb2]">—</span>
-                    )}
+                    <ShippingIndicator order={order} />
                   </div>
 
-                  {/* Status select */}
+                  {/* Status */}
                   <div onClick={e => e.stopPropagation()}>
                     <StatusSelect orderId={order._id} current={order.status} onUpdate={handleStatusUpdate} />
                   </div>
@@ -729,18 +788,15 @@ export default function AdminOrdersPage() {
                   {/* Date + Invoice */}
                   <div className="flex items-center justify-between gap-2" onClick={e => e.stopPropagation()}>
                     <span className="text-[0.68rem] text-[#a09a90]">{timeAgo(order.createdAt)}</span>
-                    <button
-                      onClick={() => setInvoiceOrder(order)}
+                    <button onClick={() => setInvoiceOrder(order)}
                       className="flex items-center gap-1 px-2 py-1 rounded-lg text-[0.62rem] font-semibold transition-all hover:scale-105"
-                      style={{ background: '#c9a84c12', color: '#c9a84c', border: '1px solid #c9a84c30' }}
-                    >
-                      <FileText size={10} strokeWidth={2} />
-                      Invoice
+                      style={{ background: '#c9a84c12', color: '#c9a84c', border: '1px solid #c9a84c30' }}>
+                      <FileText size={10} strokeWidth={2} /> Invoice
                     </button>
                   </div>
                 </div>
 
-                {/* Expanded detail with FedEx panel */}
+                {/* Expanded detail */}
                 {expandedId === order._id && (
                   <OrderDetail order={order} onLabelGenerated={handleLabelGenerated} />
                 )}
@@ -754,19 +810,23 @@ export default function AdminOrdersPage() {
           <div className="flex items-center justify-between px-5 py-3 border-t border-[#ede9e1] bg-[#faf9f7]">
             <span className="text-[0.68rem] text-[#a09a90]">Page {page} of {totalPages}</span>
             <div className="flex items-center gap-1.5">
-              <button onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1} className="w-7 h-7 rounded-lg border border-[#ede9e1] flex items-center justify-center hover:border-[#c9a84c]/40 hover:bg-white disabled:opacity-30 disabled:cursor-not-allowed transition-all">
+              <button onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1}
+                className="w-7 h-7 rounded-lg border border-[#ede9e1] flex items-center justify-center hover:border-[#c9a84c]/40 hover:bg-white disabled:opacity-30 disabled:cursor-not-allowed transition-all">
                 <ChevronLeft size={13} strokeWidth={2} className="text-[#6b6560]" />
               </button>
               {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
                 const p = page <= 3 ? i + 1 : page >= totalPages - 2 ? totalPages - 4 + i : page - 2 + i;
                 if (p < 1 || p > totalPages) return null;
                 return (
-                  <button key={p} onClick={() => setPage(p)} className="w-7 h-7 rounded-lg text-[0.7rem] font-semibold transition-all" style={p === page ? { background: '#c9a84c', color: '#fff', border: '1px solid #c9a84c' } : { background: 'transparent', color: '#6b6560', border: '1px solid #ede9e1' }}>
+                  <button key={p} onClick={() => setPage(p)}
+                    className="w-7 h-7 rounded-lg text-[0.7rem] font-semibold transition-all"
+                    style={p === page ? { background: '#c9a84c', color: '#fff', border: '1px solid #c9a84c' } : { background: 'transparent', color: '#6b6560', border: '1px solid #ede9e1' }}>
                     {p}
                   </button>
                 );
               })}
-              <button onClick={() => setPage(p => Math.min(totalPages, p + 1))} disabled={page === totalPages} className="w-7 h-7 rounded-lg border border-[#ede9e1] flex items-center justify-center hover:border-[#c9a84c]/40 hover:bg-white disabled:opacity-30 disabled:cursor-not-allowed transition-all">
+              <button onClick={() => setPage(p => Math.min(totalPages, p + 1))} disabled={page === totalPages}
+                className="w-7 h-7 rounded-lg border border-[#ede9e1] flex items-center justify-center hover:border-[#c9a84c]/40 hover:bg-white disabled:opacity-30 disabled:cursor-not-allowed transition-all">
                 <ChevronRight size={13} strokeWidth={2} className="text-[#6b6560]" />
               </button>
             </div>

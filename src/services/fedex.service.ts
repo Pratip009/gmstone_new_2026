@@ -1,10 +1,12 @@
 /**
  * fedex.service.ts
  * Core FedEx Ship API v1 wrapper.
- * Handles: OAuth token, shipment creation (label), and tracking.
+ * Handles: OAuth token, rate quotes, shipment creation (label), and tracking.
  *
  * FedEx API docs: https://developer.fedex.com/api/en-us/catalog.html
  */
+
+import type { ShippingRate, ShippingAddress, PackageDimensions, TrackingInfo } from '@/types/shipping';
 
 const FEDEX_BASE_URL =
   process.env.FEDEX_MODE === 'production'
@@ -79,6 +81,21 @@ export interface TrackingEvent {
   location?: string;
 }
 
+// ─── FedEx service code → human label ────────────────────────────────────────
+
+const FEDEX_SERVICE_NAMES: Record<string, string> = {
+  FEDEX_GROUND:             'FedEx Ground',
+  FEDEX_2_DAY:              'FedEx 2Day',
+  FEDEX_2_DAY_AM:           'FedEx 2Day AM',
+  PRIORITY_OVERNIGHT:       'FedEx Priority Overnight',
+  STANDARD_OVERNIGHT:       'FedEx Standard Overnight',
+  FIRST_OVERNIGHT:          'FedEx First Overnight',
+  FEDEX_EXPRESS_SAVER:      'FedEx Express Saver',
+  SMART_POST:               'FedEx SmartPost',
+  GROUND_HOME_DELIVERY:     'FedEx Home Delivery',
+  FEDEX_FREIGHT_PRIORITY:   'FedEx Freight Priority',
+};
+
 // ─── Token Cache ──────────────────────────────────────────────────────────────
 
 let cachedToken: string | null = null;
@@ -126,6 +143,110 @@ function getShipper(): FedExParty {
     },
     accountNumber: { value: process.env.FEDEX_ACCOUNT_NUMBER! },
   };
+}
+
+// ─── Rate Quotes ──────────────────────────────────────────────────────────────
+
+/**
+ * Get FedEx rate quotes for a shipment.
+ * Uses the "LIST" rate type (retail rates) — switch to "ACCOUNT" for
+ * negotiated rates if your FedEx account has them.
+ */
+export async function getFedExRates(
+  origin: ShippingAddress,
+  destination: ShippingAddress,
+  pkg: PackageDimensions
+): Promise<ShippingRate[]> {
+  const token = await getAccessToken();
+
+  const body = {
+    accountNumber: { value: process.env.FEDEX_ACCOUNT_NUMBER! },
+    requestedShipment: {
+      shipper: {
+        address: {
+          streetLines: [origin.street1],
+          city: origin.city,
+          stateOrProvinceCode: origin.state,
+          postalCode: origin.postalCode,
+          countryCode: origin.country,
+        },
+      },
+      recipient: {
+        address: {
+          streetLines: [destination.street1],
+          city: destination.city,
+          stateOrProvinceCode: destination.state,
+          postalCode: destination.postalCode,
+          countryCode: destination.country,
+          residential: true,
+        },
+      },
+      pickupType: 'DROPOFF_AT_FEDEX_LOCATION',
+      rateRequestType: ['LIST'],
+      requestedPackageLineItems: [
+        {
+          weight: { units: 'LB', value: Math.max(0.1, pkg.weightLbs) },
+          dimensions: {
+            length: Math.ceil(pkg.lengthIn),
+            width: Math.ceil(pkg.widthIn),
+            height: Math.ceil(pkg.heightIn),
+            units: 'IN',
+          },
+          ...(pkg.declaredValueUsd
+            ? { declaredValue: { amount: pkg.declaredValueUsd, currency: 'USD' } }
+            : {}),
+        },
+      ],
+    },
+  };
+
+  const res = await fetch(`${FEDEX_BASE_URL}/rate/v1/rates/quotes`, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${token}`,
+      'Content-Type': 'application/json',
+      'X-locale': 'en_US',
+    },
+    body: JSON.stringify(body),
+    next: { revalidate: 0 },
+  });
+
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(`FedEx rates failed: ${res.status} — ${text}`);
+  }
+
+  const data = await res.json();
+  const ratedShipments: any[] =
+    data.output?.rateReplyDetails ?? [];
+
+  return ratedShipments
+    .map((s: any): ShippingRate | null => {
+      const serviceType: string = s.serviceType ?? '';
+      const detail = s.ratedShipmentDetails?.[0];
+      const rate = parseFloat(detail?.totalNetCharge ?? '0');
+      const transitDays: number | null =
+        s.operationalDetail?.transitTime
+          ? parseInt(s.operationalDetail.transitTime.replace(/\D/g, ''), 10) || null
+          : null;
+      const commitDate: string | null =
+        s.operationalDetail?.deliveryDate ?? null;
+
+      if (!serviceType || isNaN(rate)) return null;
+
+      return {
+        carrier: 'FedEx',
+        service: FEDEX_SERVICE_NAMES[serviceType] ?? serviceType.replace(/_/g, ' '),
+        serviceCode: serviceType,
+        rate,
+        currency: 'USD',
+        estimatedDays: transitDays,
+        estimatedDelivery: commitDate ?? (transitDays ? `${transitDays} business day(s)` : null),
+        guaranteed: !!s.commit?.label,
+      };
+    })
+    .filter((r): r is ShippingRate => r !== null)
+    .sort((a, b) => a.rate - b.rate);
 }
 
 // ─── Create Shipment (generate label) ────────────────────────────────────────
@@ -217,14 +338,17 @@ export async function createFedExShipment(
   if (!shipment) throw new Error('FedEx returned no shipment data');
 
   const piece = shipment.pieceResponses?.[0];
-  const trackingNumber: string = piece?.trackingNumber ?? shipment.masterTrackingNumber?.trackingNumber;
+  const trackingNumber: string =
+    piece?.trackingNumber ?? shipment.masterTrackingNumber?.trackingNumber;
   const labelBase64: string = piece?.packageDocuments?.[0]?.encodedLabel ?? '';
 
   return {
     trackingNumber,
     labelBase64,
     labelFormat: 'PDF',
-    shipmentId: shipment.shipmentAdvisoryDetails?.regulatoryAdvisory?.prohibitions?.[0] ?? trackingNumber,
+    shipmentId:
+      shipment.shipmentAdvisoryDetails?.regulatoryAdvisory?.prohibitions?.[0] ??
+      trackingNumber,
     serviceType: shipment.serviceType ?? serviceType,
     estimatedDelivery: shipment.operationalDetail?.deliveryDate,
   };
@@ -237,11 +361,7 @@ export async function trackFedExShipment(trackingNumber: string): Promise<Tracki
 
   const body = {
     includeDetailedScans: true,
-    trackingInfo: [
-      {
-        trackingNumberInfo: { trackingNumber },
-      },
-    ],
+    trackingInfo: [{ trackingNumberInfo: { trackingNumber } }],
   };
 
   const res = await fetch(`${FEDEX_BASE_URL}/track/v1/trackingnumbers`, {
@@ -285,5 +405,27 @@ export async function trackFedExShipment(trackingNumber: string): Promise<Tracki
     estimatedDelivery: result.estimatedDeliveryTimeWindow?.window?.ends,
     actualDelivery: result.actualDeliveryTime,
     events,
+  };
+}
+
+/**
+ * trackFedExPackage — normalized wrapper used by the universal tracking route
+ * and shipping aggregator. Returns TrackingInfo shape instead of TrackingResult.
+ */
+export async function trackFedExPackage(trackingNumber: string): Promise<TrackingInfo> {
+  const result = await trackFedExShipment(trackingNumber);
+  return {
+    carrier: 'FedEx',
+    trackingNumber: result.trackingNumber,
+    status: result.statusDescription,
+    currentLocation: result.events[0]?.location ?? '',
+    lastUpdate: result.events[0]?.timestamp ?? '',
+    estimatedDelivery: result.estimatedDelivery ?? null,
+    deliveredAt: result.actualDelivery,
+    events: result.events.map((e) => ({
+      timestamp: e.timestamp,
+      description: e.description,
+      location: e.location ?? '',
+    })),
   };
 }

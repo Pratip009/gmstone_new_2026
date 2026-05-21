@@ -30,3 +30,5 @@ export function paginatedResponse<T>(
     },
   });
 }
+export const apiSuccess = successResponse;
+export const apiError   = errorResponse;

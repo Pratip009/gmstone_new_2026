@@ -19,10 +19,10 @@ export interface IShippingAddress {
   phone?: string;
 }
 
-// ─── NEW: FedEx shipment data ─────────────────────────────────────────────────
+// ─── FedEx shipment data (label generation) ───────────────────────────────────
 export interface IFedExShipment {
   trackingNumber: string;
-  labelBase64: string;   // base64-encoded PDF label
+  labelBase64: string;
   labelFormat: string;
   shipmentId: string;
   serviceType: string;
@@ -30,6 +30,7 @@ export interface IFedExShipment {
   createdAt: Date;
 }
 
+// ─── Multi-carrier shipping fields ───────────────────────────────────────────
 export interface IOrder extends Document {
   _id: mongoose.Types.ObjectId;
   user: mongoose.Types.ObjectId;
@@ -46,8 +47,18 @@ export interface IOrder extends Document {
   paypalPaymentId?: string;
   paypalPayerId?: string;
   notes?: string;
-  // ─── NEW ───────────────────────────────────────────────────────────────────
+  // ─── FedEx label (legacy — kept for existing shipped orders) ──────────────
   fedex?: IFedExShipment;
+  // ─── Multi-carrier shipping (new) ─────────────────────────────────────────
+  shippingCarrier?: 'FedEx' | 'USPS' | 'UPS' | null;
+  shippingService?: string | null;        // e.g. "Priority Mail", "UPS Ground"
+  shippingServiceCode?: string | null;    // carrier internal code
+  shippingRate?: number;                  // quoted shipping cost in USD
+  shippingEstimatedDays?: number | null;
+  shippingEstimatedDelivery?: string | null;
+  trackingNumber?: string | null;
+  trackingUrl?: string | null;
+  shippedAt?: Date | null;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -77,7 +88,7 @@ const ShippingAddressSchema = new Schema<IShippingAddress>(
   { _id: false }
 );
 
-// ─── NEW: FedEx sub-schema ────────────────────────────────────────────────────
+// ─── FedEx sub-schema (legacy label storage) ──────────────────────────────────
 const FedExShipmentSchema = new Schema<IFedExShipment>(
   {
     trackingNumber: { type: String, required: true },
@@ -119,8 +130,22 @@ const OrderSchema = new Schema<IOrder>(
     paypalPaymentId: String,
     paypalPayerId: String,
     notes: String,
-    // ─── NEW ─────────────────────────────────────────────────────────────────
+    // ─── FedEx label (legacy) ────────────────────────────────────────────────
     fedex: { type: FedExShipmentSchema, default: undefined },
+    // ─── Multi-carrier shipping ───────────────────────────────────────────────
+    shippingCarrier: {
+      type: String,
+      enum: ['FedEx', 'USPS', 'UPS', null],
+      default: null,
+    },
+    shippingService: { type: String, default: null },
+    shippingServiceCode: { type: String, default: null },
+    shippingRate: { type: Number, default: 0 },
+    shippingEstimatedDays: { type: Number, default: null },
+    shippingEstimatedDelivery: { type: String, default: null },
+    trackingNumber: { type: String, default: null, index: true },
+    trackingUrl: { type: String, default: null },
+    shippedAt: { type: Date, default: null },
   },
   { timestamps: true }
 );
@@ -129,8 +154,8 @@ OrderSchema.index({ user: 1, createdAt: -1 });
 OrderSchema.index({ status: 1 });
 OrderSchema.index({ paypalOrderId: 1 });
 OrderSchema.index({ createdAt: -1 });
-// ─── NEW index for tracking lookups ──────────────────────────────────────────
-OrderSchema.index({ 'fedex.trackingNumber': 1 });
+OrderSchema.index({ 'fedex.trackingNumber': 1 });   // legacy
+OrderSchema.index({ trackingNumber: 1 });            // multi-carrier
 
 const Order = (() => {
   if (mongoose.models && mongoose.models.Order) {

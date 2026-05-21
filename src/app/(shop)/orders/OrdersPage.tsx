@@ -4,17 +4,12 @@ import { useEffect, useState } from 'react';
 import { useApi } from '@/hooks/useApi';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
+import OrderTracking from '@/components/shipping/OrderTracking';
 
 interface OrderItem {
   name: string;
   quantity: number;
   price: number;
-}
-
-interface FedExShipment {
-  trackingNumber: string;
-  serviceType: string;
-  estimatedDelivery?: string;
 }
 
 interface Order {
@@ -24,23 +19,19 @@ interface Order {
   paymentStatus: string;
   createdAt: string;
   items: OrderItem[];
-  fedex?: FedExShipment;
-}
-
-interface TrackingEvent {
-  timestamp: string;
-  eventType: string;
-  description: string;
-  location?: string;
-}
-
-interface TrackingData {
-  trackingNumber: string;
-  status: string;
-  statusDescription: string;
-  estimatedDelivery?: string;
-  actualDelivery?: string;
-  events: TrackingEvent[];
+  // ─── Multi-carrier fields ──────────────────────────────────────────────────
+  shippingCarrier?: string | null;
+  shippingService?: string | null;
+  shippingRate?: number;
+  trackingNumber?: string | null;
+  trackingUrl?: string | null;
+  shippingEstimatedDelivery?: string | null;
+  // ─── Legacy FedEx (kept for old orders) ───────────────────────────────────
+  fedex?: {
+    trackingNumber: string;
+    serviceType: string;
+    estimatedDelivery?: string;
+  } | null;
 }
 
 // ─── Config ───────────────────────────────────────────────────────────────────
@@ -55,14 +46,6 @@ const STATUS_CONFIG: Record<string, { label: string; classes: string; dot: strin
 
 const STEP_ORDER = ['pending', 'processing', 'shipped', 'delivered'];
 const ITEM_EMOJIS = ['💎', '💍', '🌟', '✨', '🪙'];
-
-const FEDEX_STATUS_BADGE: Record<string, { bg: string; text: string; label: string }> = {
-  OD: { bg: 'bg-blue-50',   text: 'text-blue-700',   label: 'Out for Delivery' },
-  DL: { bg: 'bg-green-50',  text: 'text-green-700',  label: 'Delivered' },
-  IT: { bg: 'bg-yellow-50', text: 'text-yellow-700', label: 'In Transit' },
-  PU: { bg: 'bg-purple-50', text: 'text-purple-700', label: 'Picked Up' },
-  OC: { bg: 'bg-stone-50',  text: 'text-stone-500',  label: 'Label Created' },
-};
 
 // ─── Status Pill ──────────────────────────────────────────────────────────────
 function StatusPill({ status }: { status: string }) {
@@ -93,130 +76,24 @@ function TrackingBar({ status }: { status: string }) {
   );
 }
 
-// ─── FedEx Tracking Widget (NEW) ──────────────────────────────────────────────
-function FedExTracker({ orderId, fedex }: { orderId: string; fedex?: FedExShipment }) {
-  const { apiFetch } = useApi();
-  const [data, setData]           = useState<TrackingData | null>(null);
-  const [open, setOpen]           = useState(false);
-  const [loading, setLoading]     = useState(false);
-  const [error, setError]         = useState<string | null>(null);
-
-  if (!fedex?.trackingNumber) {
-    // No label yet — show a subtle note only for paid/processing orders
-    return (
-      <p className="text-xs text-stone-400 italic">
-        Shipment label being prepared…
-      </p>
-    );
-  }
-
-  async function handleToggle() {
-    if (open) { setOpen(false); return; }
-    if (data)  { setOpen(true); return; }
-
-    setLoading(true);
-    setError(null);
-    try {
-      const result = await apiFetch(`/api/orders/${orderId}/tracking`);
-      setData(result.data);
-      setOpen(true);
-    } catch (err) {
-      setError('Could not load tracking. Please try again.');
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  const badge = data ? (FEDEX_STATUS_BADGE[data.status] ?? { bg: 'bg-stone-50', text: 'text-stone-500', label: data.statusDescription }) : null;
-
+// ─── Carrier Badge ────────────────────────────────────────────────────────────
+function CarrierBadge({ carrier, service, rate }: { carrier: string; service?: string | null; rate?: number }) {
+  const colors: Record<string, { bg: string; text: string; accent: string }> = {
+    FedEx: { bg: '#f5f0ff', text: '#4D148C', accent: '#FF6600' },
+    USPS:  { bg: '#f0f0ff', text: '#333366', accent: '#CC0000' },
+    UPS:   { bg: '#fff8e1', text: '#351C15', accent: '#FFB500' },
+  };
+  const c = colors[carrier] ?? { bg: '#f8fafc', text: '#475569', accent: '#94a3b8' };
   return (
-    <div className="space-y-2.5">
-      {/* Tracking number row */}
-      <div className="flex items-center justify-between gap-3">
-        <div className="flex items-center gap-2 min-w-0">
-          {/* FedEx wordmark approximation */}
-          <span className="text-[0.6rem] font-black tracking-tight shrink-0">
-            <span className="text-[#4d148c]">Fed</span><span className="text-[#ff6600]">Ex</span>
-          </span>
-          <span className="font-mono text-xs text-stone-500 truncate">{fedex.trackingNumber}</span>
-          {fedex.serviceType && (
-            <span className="hidden sm:inline text-[0.6rem] text-stone-400 bg-stone-100 rounded px-1.5 py-0.5 shrink-0">
-              {fedex.serviceType.replace(/_/g, ' ')}
-            </span>
-          )}
-        </div>
-        <button
-          onClick={handleToggle}
-          disabled={loading}
-          className="shrink-0 text-[0.68rem] font-semibold text-amber-700 border border-amber-200 bg-amber-50 rounded-lg px-2.5 py-1 hover:bg-amber-100 disabled:opacity-50 transition-all"
-        >
-          {loading ? 'Loading…' : open ? 'Hide ↑' : 'Track →'}
-        </button>
-      </div>
-
-      {/* Estimated delivery (always shown) */}
-      {fedex.estimatedDelivery && !data && (
-        <p className="text-xs text-stone-400">
-          Estimated delivery: <span className="font-medium text-stone-600">{new Date(fedex.estimatedDelivery).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</span>
-        </p>
-      )}
-
-      {/* Error */}
-      {error && <p className="text-xs text-red-500">{error}</p>}
-
-      {/* Tracking detail panel */}
-      {open && data && (
-        <div className="rounded-xl border border-stone-100 bg-stone-50 p-3.5 space-y-3">
-
-          {/* Status + delivery */}
-          <div className="flex items-start justify-between gap-2">
-            {badge && (
-              <span className={`inline-flex items-center gap-1.5 text-[0.68rem] font-semibold px-2.5 py-1 rounded-full ${badge.bg} ${badge.text}`}>
-                <span className="w-1.5 h-1.5 rounded-full bg-current opacity-70" />
-                {badge.label}
-              </span>
-            )}
-            {data.actualDelivery ? (
-              <span className="text-xs text-green-600 font-medium">
-                ✓ Delivered {new Date(data.actualDelivery).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
-              </span>
-            ) : data.estimatedDelivery ? (
-              <span className="text-xs text-stone-400">
-                Est. {new Date(data.estimatedDelivery).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
-              </span>
-            ) : null}
-          </div>
-
-          {/* Event timeline */}
-          {data.events.length > 0 ? (
-            <ol className="relative border-l-2 border-stone-200 space-y-3 ml-1">
-              {data.events.slice(0, 5).map((ev, i) => (
-                <li key={i} className="ml-4">
-                  <div className={`absolute -left-[5px] mt-1 h-2.5 w-2.5 rounded-full border-2 border-white ${i === 0 ? 'bg-amber-500' : 'bg-stone-300'}`} />
-                  <p className="text-[0.6rem] text-stone-400 mb-0.5">
-                    {new Date(ev.timestamp).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })}
-                    {ev.location && <span className="ml-1.5">· {ev.location}</span>}
-                  </p>
-                  <p className="text-xs font-medium text-stone-700">{ev.description}</p>
-                </li>
-              ))}
-            </ol>
-          ) : (
-            <p className="text-xs text-stone-400 italic">No scan events yet. Check back soon.</p>
-          )}
-
-          {/* FedEx link */}
-          <a
-            href={`https://www.fedex.com/fedextrack/?trknbr=${fedex.trackingNumber}`}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="inline-flex items-center gap-1 text-[0.65rem] text-amber-700 hover:underline"
-          >
-            View full tracking on FedEx.com →
-          </a>
-        </div>
-      )}
-    </div>
+    <span style={{
+      display: 'inline-flex', alignItems: 'center', gap: 6,
+      padding: '4px 10px', borderRadius: 100,
+      background: c.bg, fontSize: 11, fontWeight: 600,
+    }}>
+      <span style={{ color: c.text }}>{carrier}</span>
+      {service && <span style={{ color: '#94a3b8', fontWeight: 400 }}>· {service}</span>}
+      {rate !== undefined && rate > 0 && <span style={{ color: c.accent }}>${rate.toFixed(2)}</span>}
+    </span>
   );
 }
 
@@ -296,63 +173,91 @@ export default function OrdersPage() {
 
           {/* Order cards */}
           <div className="flex flex-col gap-3">
-            {orders.map((order, oi) => (
-              <div key={order._id} className="border border-stone-100 rounded-2xl overflow-hidden hover:border-stone-300 hover:shadow-sm transition-all">
+            {orders.map((order, oi) => {
+              // Resolve tracking — prefer new flat fields, fall back to legacy fedex object
+              const trackingNumber = order.trackingNumber ?? order.fedex?.trackingNumber ?? null;
+              const carrier = order.shippingCarrier ?? (order.fedex ? 'FedEx' : null);
+              const trackingUrl = order.trackingUrl ?? (order.fedex
+                ? `https://www.fedex.com/fedextrack/?trknbr=${order.fedex.trackingNumber}`
+                : null);
+              const showTracking = !!trackingNumber && ['paid', 'processing', 'shipped', 'delivered'].includes(order.status);
 
-                {/* Card header */}
-                <div className="px-5 pt-5 pb-4 flex items-start justify-between border-b border-stone-50">
-                  <div>
-                    <p className="text-xs font-mono text-stone-400 tracking-wide uppercase">
-                      #{order._id.slice(-12)}
-                    </p>
-                    <p className="text-sm text-stone-500 mt-1 flex items-center gap-1.5">
-                      <span className="text-stone-300">📅</span>
-                      {new Date(order.createdAt).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}
-                    </p>
-                  </div>
-                  <div className="text-right">
-                    <p className="text-2xl font-light text-stone-900 tracking-tight">
-                      ${order.totalAmount.toLocaleString()}
-                    </p>
-                    <p className="text-xs text-stone-400 mt-0.5">order total</p>
-                  </div>
-                </div>
+              return (
+                <div key={order._id} className="border border-stone-100 rounded-2xl overflow-hidden hover:border-stone-300 hover:shadow-sm transition-all">
 
-                {/* Status + progress bar */}
-                <div className="px-5 py-3 flex items-center justify-between bg-stone-50/50">
-                  <StatusPill status={order.status} />
-                  <TrackingBar status={order.status} />
-                </div>
-
-                <div className="border-t border-stone-50" />
-
-                {/* Items */}
-                <div className="px-5 py-4 flex flex-col gap-3">
-                  {order.items.map((item, ii) => (
-                    <div key={ii} className="flex items-center justify-between">
-                      <div className="flex items-center gap-3">
-                        <div className="w-9 h-9 rounded-lg bg-stone-100 flex items-center justify-center text-base flex-shrink-0">
-                          {ITEM_EMOJIS[(oi + ii) % ITEM_EMOJIS.length]}
-                        </div>
-                        <div>
-                          <p className="text-sm text-stone-700">{item.name}</p>
-                          <p className="text-xs text-stone-400 mt-0.5">Qty {item.quantity}</p>
-                        </div>
-                      </div>
-                      <p className="text-sm font-medium text-stone-600">${item.price.toLocaleString()}</p>
+                  {/* Card header */}
+                  <div className="px-5 pt-5 pb-4 flex items-start justify-between border-b border-stone-50">
+                    <div>
+                      <p className="text-xs font-mono text-stone-400 tracking-wide uppercase">
+                        #{order._id.slice(-12)}
+                      </p>
+                      <p className="text-sm text-stone-500 mt-1 flex items-center gap-1.5">
+                        <span className="text-stone-300">📅</span>
+                        {new Date(order.createdAt).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}
+                      </p>
                     </div>
-                  ))}
-                </div>
-
-                {/* FedEx tracking section (NEW — replaces static footer) */}
-                {(order.fedex || ['paid', 'processing', 'shipped', 'delivered'].includes(order.status)) && (
-                  <div className="border-t border-stone-100 px-5 py-4 bg-stone-50/40">
-                    <FedExTracker orderId={order._id} fedex={order.fedex} />
+                    <div className="text-right">
+                      <p className="text-2xl font-light text-stone-900 tracking-tight">
+                        ${order.totalAmount.toLocaleString()}
+                      </p>
+                      <p className="text-xs text-stone-400 mt-0.5">order total</p>
+                    </div>
                   </div>
-                )}
 
-              </div>
-            ))}
+                  {/* Status + progress bar */}
+                  <div className="px-5 py-3 flex items-center justify-between bg-stone-50/50">
+                    <div className="flex items-center gap-3">
+                      <StatusPill status={order.status} />
+                      {/* Show carrier badge if a shipping method was chosen */}
+                      {carrier && (
+                        <CarrierBadge
+                          carrier={carrier}
+                          service={order.shippingService}
+                          rate={order.shippingRate}
+                        />
+                      )}
+                    </div>
+                    <TrackingBar status={order.status} />
+                  </div>
+
+                  <div className="border-t border-stone-50" />
+
+                  {/* Items */}
+                  <div className="px-5 py-4 flex flex-col gap-3">
+                    {order.items.map((item, ii) => (
+                      <div key={ii} className="flex items-center justify-between">
+                        <div className="flex items-center gap-3">
+                          <div className="w-9 h-9 rounded-lg bg-stone-100 flex items-center justify-center text-base flex-shrink-0">
+                            {ITEM_EMOJIS[(oi + ii) % ITEM_EMOJIS.length]}
+                          </div>
+                          <div>
+                            <p className="text-sm text-stone-700">{item.name}</p>
+                            <p className="text-xs text-stone-400 mt-0.5">Qty {item.quantity}</p>
+                          </div>
+                        </div>
+                        <p className="text-sm font-medium text-stone-600">${item.price.toLocaleString()}</p>
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* Tracking section */}
+                  {showTracking && trackingNumber && carrier ? (
+                    <div className="border-t border-stone-100 px-5 py-4 bg-stone-50/40">
+                      <OrderTracking
+                        trackingNumber={trackingNumber}
+                        carrier={carrier}
+                        trackingUrl={trackingUrl ?? undefined}
+                      />
+                    </div>
+                  ) : !trackingNumber && ['paid', 'processing'].includes(order.status) ? (
+                    <div className="border-t border-stone-100 px-5 py-3 bg-stone-50/40">
+                      <p className="text-xs text-stone-400 italic">Shipment label being prepared…</p>
+                    </div>
+                  ) : null}
+
+                </div>
+              );
+            })}
           </div>
         </div>
       )}
