@@ -42,6 +42,7 @@ const NAV_LINKS = [
   { href: '/admin/upload',     label: 'Bulk Upload', icon: UploadCloud, desc: 'CSV / Excel import',         accent: '#7ab0c9' },
   { href: '/admin/categories', label: 'Categories',  icon: Layers,      desc: 'Categories & subcategories', accent: '#9ab87a' },
   { href: '/admin/orders',     label: 'Orders',      icon: ShoppingBag, desc: 'Customer orders',            accent: '#c97a7a' },
+  { href: '/admin/contacts',   label: 'Contacts',    icon: Users,       desc: 'Manage customer contacts',   accent: '#7ac9a8' },
 
 ];
 

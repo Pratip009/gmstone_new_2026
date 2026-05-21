@@ -1,3 +1,4 @@
+// src/app/(shop)/contact/page.tsx
 "use client";
 
 import { useState } from "react";
@@ -60,6 +61,8 @@ type FormState = {
   message: string;
 };
 
+type FormErrors = Partial<Record<keyof FormState, string>>;
+
 export default function ContactPage() {
   const [form, setForm] = useState<FormState>({
     name: "",
@@ -68,60 +71,117 @@ export default function ContactPage() {
     subject: "",
     message: "",
   });
-  const [submitted, setSubmitted] = useState(false);
-  const [focused, setFocused] = useState<string | null>(null);
+  const [errors, setErrors]           = useState<FormErrors>({});
+  const [loading, setLoading]         = useState(false);
+  const [serverError, setServerError] = useState<string | null>(null);
+  const [submitted, setSubmitted]     = useState(false);
+  const [focused, setFocused]         = useState<string | null>(null);
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
-    setForm((prev) => ({ ...prev, [e.target.name]: e.target.value }));
+  const handleChange = (
+    e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>
+  ) => {
+    const { name, value } = e.target;
+    setForm((prev) => ({ ...prev, [name]: value }));
+    // Clear field error on change
+    if (errors[name as keyof FormState]) {
+      setErrors((prev) => ({ ...prev, [name]: undefined }));
+    }
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setSubmitted(true);
+    setErrors({});
+    setServerError(null);
+    setLoading(true);
+
+    try {
+      const res  = await fetch("/api/contact", {
+        method:  "POST",
+        headers: { "Content-Type": "application/json" },
+        body:    JSON.stringify(form),
+      });
+      const data = await res.json();
+
+      if (!res.ok) {
+        if (res.status === 422 && data.errors) {
+          // Field-level Zod errors e.g. { name: "...", email: "..." }
+          setErrors(data.errors);
+        } else {
+          setServerError(data.message || "Something went wrong. Please try again.");
+        }
+        return;
+      }
+
+      setSubmitted(true);
+    } catch {
+      setServerError("Network error. Please check your connection and try again.");
+    } finally {
+      setLoading(false);
+    }
   };
 
+  const resetForm = () => {
+    setSubmitted(false);
+    setErrors({});
+    setServerError(null);
+    setForm({ name: "", email: "", phone: "", subject: "", message: "" });
+  };
+
+  // ── Styles ──
   const inputBase =
     "w-full bg-white border rounded-xl px-4 py-3 text-sm text-slate-800 placeholder:text-slate-400 outline-none transition-all duration-200";
-  const inputStyle = (name: string) =>
+
+  const inputStyle = (name: keyof FormState) =>
     `${inputBase} ${
-      focused === name
+      errors[name]
+        ? "border-red-400 ring-2 ring-red-400/15"
+        : focused === name
         ? "border-[#112c52] ring-2 ring-[#112c52]/10 shadow-sm"
         : "border-slate-200 hover:border-slate-300"
     }`;
 
-  return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-blue-50/30" style={{ fontFamily: "'Georgia', 'Times New Roman', serif" }}>
+  const FieldError = ({ name }: { name: keyof FormState }) =>
+    errors[name] ? (
+      <p className="text-red-500 text-xs mt-1.5 flex items-center gap-1">
+        <svg className="w-3.5 h-3.5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+          <circle cx="12" cy="12" r="10" />
+          <line x1="12" y1="8" x2="12" y2="12" />
+          <line x1="12" y1="16" x2="12.01" y2="16" />
+        </svg>
+        {errors[name]}
+      </p>
+    ) : null;
 
+  return (
+    <div
+      className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-blue-50/30"
+      style={{ fontFamily: "'Georgia', 'Times New Roman', serif" }}
+    >
       {/* ── Hero ── */}
       <div className="relative bg-[#112c52] overflow-hidden">
-        {/* Decorative rings */}
         {[600, 450, 300].map((size, i) => (
           <div
             key={i}
             className="absolute rounded-full border border-white/5 pointer-events-none"
-            style={{
-              width: size,
-              height: size,
-              top: "50%",
-              left: "60%",
-              transform: "translate(-50%,-50%)",
-            }}
+            style={{ width: size, height: size, top: "50%", left: "60%", transform: "translate(-50%,-50%)" }}
           />
         ))}
         <div className="absolute top-0 right-0 w-96 h-96 bg-blue-400/10 rounded-full blur-3xl pointer-events-none" />
         <div className="absolute bottom-0 left-0 w-72 h-72 bg-white/5 rounded-full blur-3xl pointer-events-none" />
-
-        {/* Diagonal gem pattern */}
-        <div className="absolute inset-0 opacity-5 pointer-events-none" style={{
-          backgroundImage: `repeating-linear-gradient(45deg, #fff 0, #fff 1px, transparent 0, transparent 50%)`,
-          backgroundSize: "30px 30px",
-        }} />
-
+        <div
+          className="absolute inset-0 opacity-5 pointer-events-none"
+          style={{
+            backgroundImage: `repeating-linear-gradient(45deg, #fff 0, #fff 1px, transparent 0, transparent 50%)`,
+            backgroundSize: "30px 30px",
+          }}
+        />
         <div className="relative z-10 max-w-6xl mx-auto px-6 py-20 md:py-28">
           <div className="max-w-xl">
             <div className="inline-flex items-center gap-2 bg-white/10 backdrop-blur-sm border border-white/20 rounded-full px-4 py-1.5 mb-6">
               <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-              <span className="text-white/80 text-xs font-sans font-medium tracking-widest uppercase">We'd love to hear from you</span>
+              <span className="text-white/80 text-xs font-sans font-medium tracking-widest uppercase">
+                We'd love to hear from you
+              </span>
             </div>
             <h1 className="text-5xl md:text-6xl font-bold text-white leading-[1.05] mb-5 tracking-tight">
               Get in
@@ -129,13 +189,15 @@ export default function ContactPage() {
               <span className="text-blue-300 italic">Touch</span>
             </h1>
             <p className="text-white/60 text-base font-sans leading-relaxed max-w-md">
-              Whether you're a first-time buyer, a seasoned jeweler, or simply curious about our collection — our team is here to help.
+              Whether you're a first-time buyer, a seasoned jeweler, or simply curious about our
+              collection — our team is here to help.
             </p>
           </div>
         </div>
-
-        {/* Bottom wave */}
-        <div className="absolute bottom-0 left-0 right-0 h-10 bg-gradient-to-br from-slate-50 via-white to-blue-50/30" style={{ clipPath: "ellipse(55% 100% at 50% 100%)" }} />
+        <div
+          className="absolute bottom-0 left-0 right-0 h-10 bg-gradient-to-br from-slate-50 via-white to-blue-50/30"
+          style={{ clipPath: "ellipse(55% 100% at 50% 100%)" }}
+        />
       </div>
 
       {/* ── Info Cards ── */}
@@ -145,14 +207,18 @@ export default function ContactPage() {
             <div
               key={i}
               className="group bg-white rounded-2xl border border-slate-200 p-4 hover:border-[#112c52]/30 hover:shadow-lg hover:shadow-[#112c52]/5 transition-all duration-300 cursor-default"
-              style={{ animationDelay: `${i * 80}ms` }}
             >
               <div className="w-9 h-9 rounded-xl bg-[#112c52]/8 flex items-center justify-center text-[#112c52] mb-3 group-hover:bg-[#112c52] group-hover:text-white transition-all duration-300">
                 {item.icon}
               </div>
-              <p className="text-[10px] font-sans font-semibold tracking-widest uppercase text-slate-400 mb-1">{item.label}</p>
+              <p className="text-[10px] font-sans font-semibold tracking-widest uppercase text-slate-400 mb-1">
+                {item.label}
+              </p>
               {item.href ? (
-                <a href={item.href} className="text-sm font-semibold text-slate-800 hover:text-[#112c52] transition-colors block leading-tight font-sans">
+                <a
+                  href={item.href}
+                  className="text-sm font-semibold text-slate-800 hover:text-[#112c52] transition-colors block leading-tight font-sans"
+                >
                   {item.value}
                 </a>
               ) : (
@@ -179,6 +245,7 @@ export default function ContactPage() {
 
               <div className="p-8">
                 {submitted ? (
+                  /* ── Success State ── */
                   <div className="flex flex-col items-center justify-center py-16 text-center gap-4">
                     <div className="w-16 h-16 rounded-full bg-emerald-50 border-2 border-emerald-200 flex items-center justify-center">
                       <svg className="w-8 h-8 text-emerald-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -187,23 +254,39 @@ export default function ContactPage() {
                     </div>
                     <div>
                       <h3 className="text-xl font-bold text-[#112c52] mb-1">Message Sent!</h3>
-                      <p className="text-slate-500 text-sm font-sans max-w-xs">Thank you for reaching out. Our team will get back to you shortly.</p>
+                      <p className="text-slate-500 text-sm font-sans max-w-xs">
+                        Thank you for reaching out. Our team will get back to you shortly.
+                      </p>
                     </div>
                     <button
-                      onClick={() => { setSubmitted(false); setForm({ name: "", email: "", phone: "", subject: "", message: "" }); }}
+                      onClick={resetForm}
                       className="mt-2 px-5 py-2 rounded-xl bg-[#112c52] text-white text-sm font-sans font-semibold hover:bg-[#1a3d6e] transition-colors"
                     >
                       Send another message
                     </button>
                   </div>
                 ) : (
-                  <form onSubmit={handleSubmit} className="space-y-5 font-sans">
+                  /* ── Form ── */
+                  <form onSubmit={handleSubmit} className="space-y-5 font-sans" noValidate>
+
+                    {/* Server-level error banner */}
+                    {serverError && (
+                      <div className="flex items-start gap-3 bg-red-50 border border-red-200 text-red-700 rounded-xl px-4 py-3 text-sm">
+                        <svg className="w-4 h-4 mt-0.5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" />
+                        </svg>
+                        {serverError}
+                      </div>
+                    )}
+
+                    {/* Name + Email */}
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                       <div>
-                        <label className="block text-xs font-semibold text-slate-600 tracking-wide uppercase mb-1.5">Full Name *</label>
+                        <label className="block text-xs font-semibold text-slate-600 tracking-wide uppercase mb-1.5">
+                          Full Name *
+                        </label>
                         <input
                           name="name"
-                          required
                           value={form.name}
                           onChange={handleChange}
                           onFocus={() => setFocused("name")}
@@ -211,13 +294,15 @@ export default function ContactPage() {
                           placeholder="Jane Smith"
                           className={inputStyle("name")}
                         />
+                        <FieldError name="name" />
                       </div>
                       <div>
-                        <label className="block text-xs font-semibold text-slate-600 tracking-wide uppercase mb-1.5">Email *</label>
+                        <label className="block text-xs font-semibold text-slate-600 tracking-wide uppercase mb-1.5">
+                          Email *
+                        </label>
                         <input
                           name="email"
                           type="email"
-                          required
                           value={form.email}
                           onChange={handleChange}
                           onFocus={() => setFocused("email")}
@@ -225,12 +310,16 @@ export default function ContactPage() {
                           placeholder="jane@example.com"
                           className={inputStyle("email")}
                         />
+                        <FieldError name="email" />
                       </div>
                     </div>
 
+                    {/* Phone + Subject */}
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                       <div>
-                        <label className="block text-xs font-semibold text-slate-600 tracking-wide uppercase mb-1.5">Phone</label>
+                        <label className="block text-xs font-semibold text-slate-600 tracking-wide uppercase mb-1.5">
+                          Phone
+                        </label>
                         <input
                           name="phone"
                           type="tel"
@@ -241,12 +330,14 @@ export default function ContactPage() {
                           placeholder="+1 (555) 000-0000"
                           className={inputStyle("phone")}
                         />
+                        <FieldError name="phone" />
                       </div>
                       <div>
-                        <label className="block text-xs font-semibold text-slate-600 tracking-wide uppercase mb-1.5">Subject *</label>
+                        <label className="block text-xs font-semibold text-slate-600 tracking-wide uppercase mb-1.5">
+                          Subject *
+                        </label>
                         <select
                           name="subject"
-                          required
                           value={form.subject}
                           onChange={handleChange}
                           onFocus={() => setFocused("subject")}
@@ -255,21 +346,24 @@ export default function ContactPage() {
                         >
                           <option value="">Select a topic…</option>
                           <option>Product Inquiry</option>
-                          <option>Order & Shipping</option>
-                          <option>Returns & Refunds</option>
+                          <option>Order &amp; Shipping</option>
+                          <option>Returns &amp; Refunds</option>
                           <option>Custom / Resize Order</option>
                           <option>Wholesale / Bulk</option>
                           <option>Showroom Visit</option>
                           <option>Other</option>
                         </select>
+                        <FieldError name="subject" />
                       </div>
                     </div>
 
+                    {/* Message */}
                     <div>
-                      <label className="block text-xs font-semibold text-slate-600 tracking-wide uppercase mb-1.5">Message *</label>
+                      <label className="block text-xs font-semibold text-slate-600 tracking-wide uppercase mb-1.5">
+                        Message *
+                      </label>
                       <textarea
                         name="message"
-                        required
                         rows={5}
                         value={form.message}
                         onChange={handleChange}
@@ -278,18 +372,44 @@ export default function ContactPage() {
                         placeholder="Tell us what you're looking for, or ask us anything…"
                         className={`${inputStyle("message")} resize-none`}
                       />
+                      <div className="flex items-start justify-between">
+                        <FieldError name="message" />
+                        <span className={`text-xs mt-1.5 ml-auto ${form.message.length > 1800 ? "text-red-400" : "text-slate-400"}`}>
+                          {form.message.length}/2000
+                        </span>
+                      </div>
                     </div>
 
+                    {/* Footer */}
                     <div className="flex items-center justify-between pt-1">
                       <p className="text-xs text-slate-400">* Required fields</p>
                       <button
                         type="submit"
-                        className="group flex items-center gap-2 bg-[#112c52] hover:bg-[#1a3d6e] text-white px-6 py-3 rounded-xl text-sm font-semibold transition-all duration-200 shadow-lg shadow-[#112c52]/20 hover:shadow-[#112c52]/30 hover:-translate-y-0.5"
+                        disabled={loading}
+                        className="group flex items-center gap-2 bg-[#112c52] hover:bg-[#1a3d6e] disabled:opacity-60 disabled:cursor-not-allowed text-white px-6 py-3 rounded-xl text-sm font-semibold transition-all duration-200 shadow-lg shadow-[#112c52]/20 hover:shadow-[#112c52]/30 hover:-translate-y-0.5 disabled:hover:translate-y-0"
                       >
-                        Send Message
-                        <svg className="w-4 h-4 group-hover:translate-x-1 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                          <path strokeLinecap="round" strokeLinejoin="round" d="M14 5l7 7m0 0l-7 7m7-7H3" />
-                        </svg>
+                        {loading ? (
+                          <>
+                            <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
+                              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                            </svg>
+                            Sending…
+                          </>
+                        ) : (
+                          <>
+                            Send Message
+                            <svg
+                              className="w-4 h-4 group-hover:translate-x-1 transition-transform"
+                              fill="none"
+                              viewBox="0 0 24 24"
+                              stroke="currentColor"
+                              strokeWidth={2}
+                            >
+                              <path strokeLinecap="round" strokeLinejoin="round" d="M14 5l7 7m0 0l-7 7m7-7H3" />
+                            </svg>
+                          </>
+                        )}
                       </button>
                     </div>
                   </form>
@@ -354,7 +474,8 @@ export default function ContactPage() {
                 </div>
                 <h3 className="text-white font-bold text-base mb-1">Book a Showroom Visit</h3>
                 <p className="text-white/60 text-xs font-sans leading-relaxed mb-4">
-                  Browse our full collection in person. One of our specialists will be dedicated to you throughout your visit.
+                  Browse our full collection in person. One of our specialists will be dedicated to
+                  you throughout your visit.
                 </p>
                 <a
                   href="tel:9143101480"
@@ -374,7 +495,9 @@ export default function ContactPage() {
       {/* ── Bottom strip ── */}
       <div className="border-t border-slate-200 bg-white mt-4">
         <div className="max-w-6xl mx-auto px-6 py-5 flex flex-col sm:flex-row items-center justify-between gap-3 font-sans">
-          <p className="text-xs text-slate-400">© {new Date().getFullYear()} Your Gemstone Store. All rights reserved.</p>
+          <p className="text-xs text-slate-400">
+            © {new Date().getFullYear()} Your Gemstone Store. All rights reserved.
+          </p>
           <div className="flex items-center gap-4 text-xs text-slate-400">
             <span>Secure 128-bit SSL</span>
             <span className="w-1 h-1 rounded-full bg-slate-300" />

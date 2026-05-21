@@ -10,6 +10,7 @@ import {
   ExternalLink,
   ChevronRight,
   HomeIcon,
+  Users
 } from 'lucide-react';
 
 const NAV = [
@@ -19,6 +20,7 @@ const NAV = [
   { href: '/admin/upload',     label: 'Bulk Upload', icon: UploadCloud },
   { href: '/admin/categories', label: 'Categories',  icon: Layers },
   { href: '/admin/orders',     label: 'Orders',      icon: ShoppingBag },
+  { href: '/admin/contacts',   label: 'Contacts',    icon: Users },
 ];
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
