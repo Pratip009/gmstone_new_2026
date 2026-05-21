@@ -179,3 +179,96 @@ export async function validateUspsAddress(address: ShippingAddress): Promise<{
     return { valid: false, error: err.message };
   }
 }
+
+// ─── Shipment / Label Creation ────────────────────────────────────────────────
+
+export interface UspsShipmentResult {
+  trackingNumber: string;
+  labelBase64: string;   // base64-encoded GIF/PNG label image
+  labelFormat: string;   // "IMAGE/GIF" or "IMAGE/PNG"
+  serviceType: string;
+  estimatedDelivery: string | null;
+  createdAt: string;
+  carrier: 'USPS';
+}
+
+/**
+ * Creates a USPS Priority Mail label via the eVS (Electronic Verification System) API.
+ * Returns the label as a base64-encoded image and a tracking number.
+ *
+ * USPS requires the account to have eVS / Click-N-Ship Business enabled.
+ * For sandbox testing set USPS_BASE_URL to https://stg-secure.shippingapis.com/ShippingAPI.dll
+ */
+export async function createUspsShipment(
+  origin: ShippingAddress,
+  destination: ShippingAddress,
+  pkg: PackageDimensions,
+  options: { serviceType?: string; customerRef?: string } = {}
+): Promise<UspsShipmentResult> {
+  const serviceType = options.serviceType ?? 'Priority';
+
+  const weightLbs  = Math.floor(pkg.weightLbs);
+  const weightOz   = Math.round((pkg.weightLbs - weightLbs) * 16);
+
+  const xmlBody = `
+<eVSRequest USERID="${USPS_USER_ID}">
+  <Option/>
+  <Revision>2</Revision>
+  <ImageParameters>
+    <ImageType>PDF</ImageType>
+    <LabelSequence>
+      <PackageNumber>1</PackageNumber>
+      <TotalPackages>1</TotalPackages>
+    </LabelSequence>
+  </ImageParameters>
+  <FromName>${origin.fullName ?? 'Sender'}</FromName>
+  <FromFirm>${origin.company ?? ''}</FromFirm>
+  <FromAddress1>${origin.street2 ?? ''}</FromAddress1>
+  <FromAddress2>${origin.street1}</FromAddress2>
+  <FromCity>${origin.city}</FromCity>
+  <FromState>${origin.state}</FromState>
+  <FromZip5>${origin.postalCode.slice(0, 5)}</FromZip5>
+  <FromZip4></FromZip4>
+  <FromPhone>${(origin.phone ?? '').replace(/\D/g, '')}</FromPhone>
+  <ToName>${destination.fullName ?? ''}</ToName>
+  <ToFirm>${destination.company ?? ''}</ToFirm>
+  <ToAddress1>${destination.street2 ?? ''}</ToAddress1>
+  <ToAddress2>${destination.street1}</ToAddress2>
+  <ToCity>${destination.city}</ToCity>
+  <ToState>${destination.state}</ToState>
+  <ToZip5>${destination.postalCode.slice(0, 5)}</ToZip5>
+  <ToZip4></ToZip4>
+  <ToPhone>${(destination.phone ?? '').replace(/\D/g, '')}</ToPhone>
+  <WeightInOunces>${weightLbs * 16 + weightOz}</WeightInOunces>
+  <ServiceType>${serviceType}</ServiceType>
+  <Container>VARIABLE</Container>
+  <Width>${pkg.widthIn}</Width>
+  <Length>${pkg.lengthIn}</Length>
+  <Height>${pkg.heightIn}</Height>
+  <Girth/>
+  <Machinable>true</Machinable>
+  <CustomerRefNo>${options.customerRef ?? ''}</CustomerRefNo>
+  <InsuredAmount>${pkg.declaredValueUsd ?? 0}</InsuredAmount>
+  <AddressServiceRequested>true</AddressServiceRequested>
+</eVSRequest>`.trim();
+
+  const xml = await uspsRequest('eVS', xmlBody);
+
+  const trackingNumber = xmlValue(xml, 'BarcodeNumber');
+  const labelBase64    = xmlValue(xml, 'LabelImage');
+  const labelType      = xmlValue(xml, 'LabelImageType') || 'PDF';
+
+  if (!trackingNumber) {
+    throw new Error('USPS did not return a tracking number — check your eVS credentials and account setup');
+  }
+
+  return {
+    trackingNumber,
+    labelBase64,
+    labelFormat: labelType,
+    serviceType,
+    estimatedDelivery: null,   // USPS eVS doesn't return a delivery date in label response
+    createdAt: new Date().toISOString(),
+    carrier: 'USPS',
+  };
+}

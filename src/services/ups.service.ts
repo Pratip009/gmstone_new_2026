@@ -355,3 +355,141 @@ export async function validateUpsAddress(address: ShippingAddress): Promise<{
     return { valid: false, error: err.message };
   }
 }
+
+// ─── Shipment / Label Creation ────────────────────────────────────────────────
+
+export interface UpsShipmentResult {
+  trackingNumber: string;
+  labelBase64: string;   // base64-encoded GIF/ZPL label
+  labelFormat: string;   // "GIF" or "ZPL"
+  shipmentId: string;
+  serviceType: string;
+  serviceCode: string;
+  estimatedDelivery: string | null;
+  createdAt: string;
+  carrier: 'UPS';
+}
+
+/**
+ * Creates a UPS shipment and generates a shipping label via the UPS Shipping v2403 API.
+ * Uses the OAuth token obtained by getUpsAccessToken().
+ *
+ * Sandbox: set UPS_BASE_URL=https://wwwcie.ups.com
+ * Production: set UPS_BASE_URL=https://onlinetools.ups.com
+ */
+export async function createUpsShipment(
+  origin: ShippingAddress,
+  destination: ShippingAddress,
+  pkg: PackageDimensions,
+  options: { serviceCode?: string; customerRef?: string } = {}
+): Promise<UpsShipmentResult> {
+  const token = await getUpsAccessToken();
+  const serviceCode = options.serviceCode ?? '03';  // '03' = UPS Ground
+
+  const body = {
+    ShipmentRequest: {
+      Request: {
+        RequestOption: 'nonvalidate',
+        SubVersion: '2205',
+        TransactionReference: { CustomerContext: options.customerRef ?? 'order' },
+      },
+      Shipment: {
+        Description: pkg.description ?? 'Gemstone jewellery',
+        Shipper: {
+          Name: origin.fullName ?? 'Alpha Imports',
+          AttentionName: origin.fullName ?? 'Alpha Imports',
+          Phone: { Number: (origin.phone ?? '').replace(/\D/g, '') },
+          ShipperNumber: UPS_ACCOUNT_NUMBER,
+          Address: {
+            AddressLine: [origin.street1, origin.street2 ?? ''].filter(Boolean),
+            City: origin.city,
+            StateProvinceCode: origin.state,
+            PostalCode: origin.postalCode,
+            CountryCode: origin.country,
+          },
+        },
+        ShipTo: {
+          Name: destination.fullName ?? '',
+          AttentionName: destination.fullName ?? '',
+          Phone: { Number: (destination.phone ?? '').replace(/\D/g, '') },
+          Address: {
+            AddressLine: [destination.street1, destination.street2 ?? ''].filter(Boolean),
+            City: destination.city,
+            StateProvinceCode: destination.state,
+            PostalCode: destination.postalCode,
+            CountryCode: destination.country,
+          },
+        },
+        PaymentInformation: {
+          ShipmentCharge: {
+            Type: '01',
+            BillShipper: { AccountNumber: UPS_ACCOUNT_NUMBER },
+          },
+        },
+        Service: { Code: serviceCode },
+        Package: {
+          Packaging: { Code: '02' },  // Customer-supplied package
+          Dimensions: {
+            UnitOfMeasurement: { Code: 'IN' },
+            Length: String(pkg.lengthIn),
+            Width: String(pkg.widthIn),
+            Height: String(pkg.heightIn),
+          },
+          PackageWeight: {
+            UnitOfMeasurement: { Code: 'LBS' },
+            Weight: String(pkg.weightLbs),
+          },
+          ...(pkg.declaredValueUsd
+            ? { PackageServiceOptions: { DeclaredValue: { CurrencyCode: 'USD', MonetaryValue: String(pkg.declaredValueUsd) } } }
+            : {}),
+          ReferenceNumber: { Value: options.customerRef ?? '' },
+        },
+      },
+      LabelSpecification: {
+        LabelImageFormat: { Code: 'GIF' },
+        HTTPUserAgent: 'Mozilla/4.5',
+      },
+    },
+  };
+
+  const res = await fetch(`${UPS_BASE_URL}/api/shipments/v2403/ship`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${token}`,
+      transId: options.customerRef ?? 'order',
+      transactionSrc: 'gmstone',
+    },
+    body: JSON.stringify(body),
+  });
+
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(`UPS Ship API error (${res.status}): ${text.slice(0, 300)}`);
+  }
+
+  const data = await res.json();
+  const result = data?.ShipmentResponse?.ShipmentResults;
+
+  if (!result) throw new Error('UPS returned unexpected response shape');
+
+  const pkg0 = result.PackageResults?.[0];
+  const trackingNumber  = pkg0?.TrackingNumber ?? result.ShipmentIdentificationNumber ?? '';
+  const labelBase64     = pkg0?.ShippingLabel?.GraphicImage ?? '';
+  const labelFormat     = pkg0?.ShippingLabel?.ImageFormat?.Code ?? 'GIF';
+  const shipmentId      = result.ShipmentIdentificationNumber ?? '';
+
+  if (!trackingNumber) throw new Error('UPS did not return a tracking number');
+
+  return {
+    trackingNumber,
+    labelBase64,
+    labelFormat,
+    shipmentId,
+    serviceCode,
+    serviceType: UPS_SERVICE_NAMES[serviceCode] ?? `UPS Service ${serviceCode}`,
+    estimatedDelivery: result.TimeInTransit?.ServiceSummary?.EstimatedArrival?.Arrival?.Date ?? null,
+    createdAt: new Date().toISOString(),
+    carrier: 'UPS',
+  };
+}

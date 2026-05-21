@@ -4,6 +4,8 @@ import Product, { IProduct } from '@/models/Product';
 import { clearCart, calculateCartTotals } from './cart.service';
 import { capturePayPalOrder, createPayPalOrder } from './paypal.service';
 import { createFedExShipment, trackFedExShipment } from './fedex.service';
+import { createUspsShipment } from './usps.service';
+import { createUpsShipment } from './ups.service';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -250,4 +252,109 @@ export async function getOrderTracking(orderId: string, userId?: string) {
   if (!order.fedex?.trackingNumber) throw new Error('No tracking number for this order');
 
   return trackFedExShipment(order.fedex.trackingNumber);
+}
+// ─── USPS label generation ─────────────────────────────────────────────────────
+
+export async function generateUspsLabel(orderId: string) {
+  const order = await Order.findById(orderId) as IOrder | null;
+  if (!order) throw new Error('Order not found');
+  if (order.paymentStatus !== 'completed') {
+    throw new Error('Cannot generate label: payment not completed');
+  }
+
+  const { STORE_ORIGIN, DEFAULT_PACKAGE } = await import('@/lib/shipping-config');
+
+  const totalItems = order.items.reduce((sum, i) => sum + i.quantity, 0);
+  const pkg = {
+    ...DEFAULT_PACKAGE,
+    weightLbs: estimateWeightLb(totalItems),
+    declaredValueUsd: order.subtotal,
+    description: 'Gemstone jewellery',
+  };
+
+  const destination = {
+    fullName:   order.shippingAddress.fullName,
+    street1:    order.shippingAddress.addressLine1,
+    street2:    order.shippingAddress.addressLine2,
+    city:       order.shippingAddress.city,
+    state:      order.shippingAddress.state,
+    postalCode: order.shippingAddress.postalCode,
+    country:    order.shippingAddress.country,
+    phone:      order.shippingAddress.phone,
+  };
+
+  const result = await createUspsShipment(STORE_ORIGIN, destination, pkg, {
+    customerRef: order._id.toString(),
+  });
+
+  await Order.findByIdAndUpdate(orderId, {
+    $set: {
+      usps: {
+        trackingNumber:   result.trackingNumber,
+        labelBase64:      result.labelBase64,
+        labelFormat:      result.labelFormat,
+        serviceType:      result.serviceType,
+        estimatedDelivery: result.estimatedDelivery,
+        createdAt:        new Date(),
+        carrier:          'USPS',
+      },
+      ...(order.status === 'paid' && { status: 'processing' }),
+    },
+  });
+
+  return Order.findById(orderId).lean();
+}
+
+// ─── UPS label generation ──────────────────────────────────────────────────────
+
+export async function generateUpsLabel(orderId: string) {
+  const order = await Order.findById(orderId) as IOrder | null;
+  if (!order) throw new Error('Order not found');
+  if (order.paymentStatus !== 'completed') {
+    throw new Error('Cannot generate label: payment not completed');
+  }
+
+  const { STORE_ORIGIN, DEFAULT_PACKAGE } = await import('@/lib/shipping-config');
+
+  const totalItems = order.items.reduce((sum, i) => sum + i.quantity, 0);
+  const pkg = {
+    ...DEFAULT_PACKAGE,
+    weightLbs: estimateWeightLb(totalItems),
+    declaredValueUsd: order.subtotal,
+    description: 'Gemstone jewellery',
+  };
+
+  const destination = {
+    fullName:   order.shippingAddress.fullName,
+    street1:    order.shippingAddress.addressLine1,
+    street2:    order.shippingAddress.addressLine2,
+    city:       order.shippingAddress.city,
+    state:      order.shippingAddress.state,
+    postalCode: order.shippingAddress.postalCode,
+    country:    order.shippingAddress.country,
+    phone:      order.shippingAddress.phone,
+  };
+
+  const result = await createUpsShipment(STORE_ORIGIN, destination, pkg, {
+    customerRef: order._id.toString(),
+  });
+
+  await Order.findByIdAndUpdate(orderId, {
+    $set: {
+      ups: {
+        trackingNumber:    result.trackingNumber,
+        labelBase64:       result.labelBase64,
+        labelFormat:       result.labelFormat,
+        shipmentId:        result.shipmentId,
+        serviceType:       result.serviceType,
+        serviceCode:       result.serviceCode,
+        estimatedDelivery: result.estimatedDelivery,
+        createdAt:         new Date(),
+        carrier:           'UPS',
+      },
+      ...(order.status === 'paid' && { status: 'processing' }),
+    },
+  });
+
+  return Order.findById(orderId).lean();
 }

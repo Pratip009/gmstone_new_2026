@@ -138,7 +138,7 @@ export default function HeroBanner() {
       {/* Parallax image */}
       <div ref={imgRef} style={{ position:"absolute", inset:"-12% 0", zIndex:10 }}>
         <Image
-          src="/images/hero1.webp"
+          src="/images/gg.webp"
           alt="Colored Diamonds, Fine Gemstones & Jewelry Since 1988"
           fill priority sizes="100vw"
           style={{ objectFit:"cover", objectPosition:"center 30%" }}

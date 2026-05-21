@@ -133,6 +133,9 @@ const CARRIER_CONFIG = {
   },
 } as const;
 
+// Maps lowercase order keys → correctly-cased CARRIER_CONFIG keys
+const CARRIER_KEY_MAP = { fedex: 'FedEx', usps: 'USPS', ups: 'UPS' } as const;
+
 const ALL_STATUSES = ['pending', 'paid', 'processing', 'shipped', 'delivered', 'cancelled', 'refunded'];
 
 function timeAgo(iso: string) {
@@ -360,7 +363,6 @@ function CarrierPanel({
       const res = await authFetch(`/api/admin/orders/${order._id}/${cfg.labelRoute}`, { method: 'POST' });
       const data = await res.json();
       if (!res.ok) throw new Error(data.message ?? `Failed to generate ${carrier} label`);
-      // API returns the updated order; pick the carrier-specific shipment
       const newShipment = (data.data?.order?.[carrierKey] ?? data.data?.[carrierKey]) as CarrierShipment;
       setShipment(newShipment);
       onLabelGenerated(order._id, carrier, newShipment);
@@ -535,14 +537,12 @@ function ShippingIndicator({ order }: { order: Order }) {
     );
   }
 
-  // Show badges for each carrier that has a label
   const carriers = (['fedex', 'usps', 'ups'] as const).filter(c => order[c]);
   return (
     <div className="flex flex-wrap gap-1">
       {carriers.map(c => {
-        const carrier = c.toUpperCase() as 'FEDEX' | 'USPS' | 'UPS';
-        const key = carrier === 'FEDEX' ? 'FedEx' : carrier as 'USPS' | 'UPS';
-        const carrierCfg = CARRIER_CONFIG[key === 'FEDEX' ? 'FedEx' : key as 'USPS' | 'UPS'];
+        const key = CARRIER_KEY_MAP[c];
+        const carrierCfg = CARRIER_CONFIG[key];
         return (
           <span key={c} className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-[0.58rem] font-bold"
             style={{ background: carrierCfg.badgeBg, color: carrierCfg.badgeText, border: `1px solid ${carrierCfg.badgeBorder}` }}>

@@ -5,7 +5,7 @@
  */
 
 import { AllCarrierRates, ShippingAddress, PackageDimensions, ShippingRate } from "@/types/shipping";
-import { getFedexRates } from "@/services/fedex.service";
+import {getFedExRates} from "@/services/fedex.service";
 import { getUspsRates } from "@/services/usps.service";
 import { getUpsRates } from "@/services/ups.service";
 
@@ -22,7 +22,7 @@ export async function getAllCarrierRates(
   pkg: PackageDimensions
 ): Promise<AllCarrierRates> {
   const [fedexResult, uspsResult, upsResult] = await Promise.allSettled([
-    getFedexRates(origin, destination, pkg),
+    getFedExRates(origin, destination, pkg),
     getUspsRates(origin, destination, pkg),
     getUpsRates(origin, destination, pkg),
   ]);

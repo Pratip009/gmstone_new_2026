@@ -412,6 +412,9 @@ export async function trackFedExShipment(trackingNumber: string): Promise<Tracki
  * trackFedExPackage — normalized wrapper used by the universal tracking route
  * and shipping aggregator. Returns TrackingInfo shape instead of TrackingResult.
  */
+// Alias used by shipping.aggregator.ts (camelCase vs PascalCase reconciliation)
+export const getFedexRates = getFedExRates;
+
 export async function trackFedExPackage(trackingNumber: string): Promise<TrackingInfo> {
   const result = await trackFedExShipment(trackingNumber);
   return {

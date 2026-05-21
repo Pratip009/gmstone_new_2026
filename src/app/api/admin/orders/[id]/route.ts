@@ -7,23 +7,47 @@ export const PUT = withAdmin(async (req: AuthenticatedRequest, context: { params
   try {
     await connectDB();
     const { id } = await context.params;
-    const { status } = await req.json();
+    const body = await req.json();
+    const { status, trackingNumber, shippingCarrier, trackingUrl } = body;
 
     const validStatuses = ['pending', 'paid', 'processing', 'shipped', 'delivered', 'cancelled', 'refunded'];
-    if (!validStatuses.includes(status)) {
+    if (status && !validStatuses.includes(status)) {
       return errorResponse(`Invalid status. Must be one of: ${validStatuses.join(', ')}`, 400);
+    }
+
+    const $set: Record<string, unknown> = {};
+    if (status) $set.status = status;
+    if (trackingNumber !== undefined) $set.trackingNumber = trackingNumber;
+    if (shippingCarrier !== undefined) $set.shippingCarrier = shippingCarrier;
+    if (trackingUrl !== undefined) $set.trackingUrl = trackingUrl;
+
+    if (Object.keys($set).length === 0) {
+      return errorResponse('No fields to update', 400);
     }
 
     const order = await Order.findByIdAndUpdate(
       id,
-      { $set: { status } },
+      { $set },
       { new: true }
-    ).lean();
+    ).populate('user', 'name email').lean();
 
     if (!order) return errorResponse('Order not found', 404);
     return successResponse(order);
   } catch (err) {
     console.error('[updateOrder]', err);
     return errorResponse('Failed to update order', 500);
+  }
+});
+
+export const GET = withAdmin(async (req: AuthenticatedRequest, context: { params: Promise<{ id: string }> }) => {
+  try {
+    await connectDB();
+    const { id } = await context.params;
+    const order = await Order.findById(id).populate('user', 'name email').lean();
+    if (!order) return errorResponse('Order not found', 404);
+    return successResponse(order);
+  } catch (err) {
+    console.error('[getOrder]', err);
+    return errorResponse('Failed to fetch order', 500);
   }
 });

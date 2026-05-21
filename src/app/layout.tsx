@@ -3,6 +3,7 @@ import type { Metadata } from "next";
 import Providers from "./providers";
 import "./global.css";
 import StartupLoader from "./StartupLoader";
+import FloatingSocialIcons from "@/components/ui/FloatingSocialIcons";
 
 export const metadata: Metadata = {
   title: "Alpha Imports — Fine Diamonds & Gemstones",
@@ -22,7 +23,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       </head>
       <body style={{ background: "var(--bg)", color: "var(--text)", position: "relative" }}>
         <Providers>
-          <StartupLoader>{children}</StartupLoader>
+          <StartupLoader>{children}<FloatingSocialIcons /></StartupLoader>
         </Providers>
       </body>
     </html>
