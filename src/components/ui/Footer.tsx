@@ -1,33 +1,113 @@
 'use client';
 import { Gem, Mail, Phone, MapPin, ArrowUpRight, Heart } from 'lucide-react';
-
+import Link from 'next/link';
+import FooterSitemap from "../sitemap/FooterSitemap";
 const FOOTER_COLUMNS = [
   {
     title: 'Help & Policies',
     links: [
-      'Privacy Policy', 'Return Policy', 'Shipping Policy',
-      'Drop Shipping', 'Terms & Conditions', 'ADA Compliance',
+      {
+        label: 'Privacy Policy',
+        href: '/privacy-policy',
+      },
+      {
+        label: 'Return Policy',
+        href: '/return-policy',
+      },
+      {
+        label: 'Shipping Policy',
+        href: '/shipping-policy',
+      },
+      {
+        label: 'Drop Shipping Program',
+        href: '/drop-shipping',
+      },
+      {
+        label: 'Terms & Conditions',
+        href: '/terms-and-conditions',
+      },
     ],
   },
+
   {
     title: 'Customer Service',
     links: [
-      'Help Center', 'Track My Order', 'FAQ',
-      'Wish List', 'Sell Your Products', 'Careers',
+      {
+        label: 'Help Center',
+        href: '/help-center',
+      },
+      {
+        label: 'Track My Order',
+        href: '/where-is-my-order',
+      },
+      {
+        label: 'FAQ',
+        href: '/faq',
+      },
+      {
+        label: 'Wish List',
+        href: '/wishlist',
+      },
+      {
+        label: 'Customer Service Center',
+        href: '/customer-service',
+      },
     ],
   },
+
   {
     title: 'Find Products',
     links: [
-      'Advanced Search', 'Site Map', 'Alpha Bargains',
-      'Order by Tel / Fax', '$10 Off First Order', 'Volume Discount',
+      {
+        label: 'Find Products',
+        href: '/find-products',
+      },
+      {
+        label: 'Subscribe to Alpha Bargains',
+        href: '/alpha-bargains',
+      },
+      {
+        label: 'Ask for Catalog',
+        href: '/ask-for-catalog',
+      },
+      {
+        label: 'Volume Discount Program',
+        href: '/volume-discount',
+      },
+      {
+      label: 'Sitemap',
+      href: '/sitemap',
+    },
     ],
   },
+
   {
     title: 'Product Info',
     links: [
-      'Learning Center', 'Expert Advice', 'E-Catalog',
-      'Quality Score Chart', 'Certificates & Appraisal', 'Join Alpha Club',
+      {
+        label: 'Learning Center',
+        href: '/learning-center',
+      },
+      {
+        label: 'Expert Advice',
+        href: '/expert-advice',
+      },
+      {
+        label: 'E-Catalog',
+        href: '/e-catalog',
+      },
+      {
+        label: 'Quality Score Chart',
+        href: '/quality-score-chart',
+      },
+      {
+        label: 'Certificates & Appraisal',
+        href: '/certificates-appraisal',
+      },
+      {
+        label: 'Join Our Alpha Club',
+        href: '/join-alpha-club',
+      },
     ],
   },
 ];
@@ -154,19 +234,11 @@ export default function Footer() {
                 {title}
               </h3>
               <ul className="flex flex-col gap-2">
-                {links.map((label) => (
-                  <li key={label}>
-                    <button
-                      className="group flex items-center gap-1 text-[0.73rem] font-medium text-left transition-all duration-150"
-                      style={{ color: '#7a736a' }}
-                      onMouseEnter={e => {
-                        e.currentTarget.style.color = '#1a1714';
-                        (e.currentTarget.style as CSSStyleDeclaration & { paddingLeft: string }).paddingLeft = '4px';
-                      }}
-                      onMouseLeave={e => {
-                        e.currentTarget.style.color = '#7a736a';
-                        (e.currentTarget.style as CSSStyleDeclaration & { paddingLeft: string }).paddingLeft = '0px';
-                      }}
+                {links.map((link) => (
+                  <li key={link.href}>
+                    <Link
+                      href={link.href}
+                      className="group flex items-center gap-1 text-[0.73rem] font-medium"
                     >
                       <ArrowUpRight
                         size={9}
@@ -174,8 +246,8 @@ export default function Footer() {
                         className="opacity-0 group-hover:opacity-100 shrink-0 transition-opacity duration-150"
                         style={{ color: '#c9a84c' }}
                       />
-                      {label}
-                    </button>
+                      {link.label}
+                    </Link>
                   </li>
                 ))}
               </ul>

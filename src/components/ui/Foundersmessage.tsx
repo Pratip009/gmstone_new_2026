@@ -90,7 +90,7 @@ export default function FoundersMessage() {
               </div>
 
               {/* Heading */}
-              <h2
+              {/* <h2
                 style={{
                   fontSize: "clamp(1.8rem, 3.5vw, 2.6rem)",
                   fontWeight: 300,
@@ -100,9 +100,9 @@ export default function FoundersMessage() {
                   marginBottom: "2rem",
                 }}
               >
-                Built on Trust,<br />
-                <span style={{ fontWeight: 600, color: "#C8A040" }}>Driven by Passion</span>
-              </h2>
+                A Personal Message From<br />
+                <span style={{ fontWeight: 600, color: "#C8A040" }}>Our CEO</span>
+              </h2> */}
 
               {/* Quote block */}
               <div className="relative flex gap-4 mb-8">
@@ -120,9 +120,8 @@ export default function FoundersMessage() {
                       zIndex: 1,
                     }}
                   >
-                    Every gemstone we offer carries a story — of origin, of craft, of the hands
-                    that shaped it. We built Alpha Imports not just to sell jewelry, but to
-                    connect people with something truly rare and lasting.
+                    Welcome to Alpha Imports NY Inc.
+Since 1988, our mission has been to offer beautiful diamonds, gemstones, and fine jewelry with exceptional value, honesty, and personal service. What began as a family passion has grown into a trusted international business serving jewelers, designers, collectors, wholesalers, and jewelry lovers around the world.
                   </p>
                 </div>
               </div>
@@ -138,9 +137,7 @@ export default function FoundersMessage() {
                   letterSpacing: "0.01em",
                 }}
               >
-                For over two decades, we've sourced directly from the world's finest mines —
-                Colombia for emeralds, Kashmir for sapphires, Burma for rubies. No middlemen,
-                no compromise. Only exceptional stones, ethically obtained and expertly graded.
+                At Alpha Imports, we believe luxury should be exciting, affordable, and accessible. Our new website combines modern technology, faster browsing, advanced search tools, and secure ordering while maintaining the personal attention and trust our customers have valued for decades.
               </p>
 
               <p
@@ -153,9 +150,19 @@ export default function FoundersMessage() {
                   letterSpacing: "0.01em",
                 }}
               >
-                Our promise remains the same as on day one: the highest quality at the most
-                honest price, backed by a satisfaction guarantee that stands behind every single
-                piece we send out.
+                Every product we offer is selected with care, and every customer is important to us. Whether you are shopping for a rare gemstone, fine jewelry, or wholesale opportunities, we are committed to providing quality merchandise at highly competitive prices.
+              </p>
+               <p
+                style={{
+                  fontSize: "0.875rem",
+                  fontWeight: 300,
+                  color: "rgba(255,255,255,0.55)",
+                  lineHeight: 1.9,
+                  marginBottom: "2.5rem",
+                  letterSpacing: "0.01em",
+                }}
+              >
+                Thank you for visiting Alpha Imports. We truly appreciate your trust and look forward to serving you for many years to come.
               </p>
 
               {/* Signature block */}
@@ -179,7 +186,7 @@ export default function FoundersMessage() {
                   <span style={{ fontSize: "14px", fontWeight: 500, color: "#C8A040" }}>BK</span>
                 </div>
                 <div>
-                  <p className="fm-sig">Balu Khatod</p>
+                  <p className="fm-sig">Mr. Balu Khatod</p>
                   <p
                     style={{
                       fontSize: "9px",
