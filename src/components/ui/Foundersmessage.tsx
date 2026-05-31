@@ -234,8 +234,8 @@ Since 1988, our mission has been to offer beautiful diamonds, gemstones, and fin
                 }}
               >
                 <Image
-                  src="https://images.unsplash.com/photo-1560250097-0b93528c311a?w=900&q=85"
-                  alt="Robert Klein, Founder of Alpha Imports"
+                  src="/images/founder.JPG"
+                  alt="Balu Khatod, Founder of Alpha Imports"
                   fill
                   className="object-cover object-top"
                   style={{ zIndex: 1 }}
