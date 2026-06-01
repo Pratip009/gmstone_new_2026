@@ -1,11 +1,14 @@
 import type { Metadata } from "next";
+
 import Providers from "./providers";
 import StartupLoader from "./StartupLoader";
 import "./global.css";
 import FloatingSocialIcons from "@/components/ui/FloatingSocialIcons";
 
+const BASE_URL = "https://gmstone-new-2026.vercel.app";
+
 export const metadata: Metadata = {
-  metadataBase: new URL("https://alphaimports.com"),
+  metadataBase: new URL(BASE_URL),
 
   title: {
     default: "Alpha Imports | Fine Diamonds, Gemstones & Jewelry",
@@ -13,7 +16,7 @@ export const metadata: Metadata = {
   },
 
   description:
-    "Discover premium diamonds, colored gemstones, sapphires, rubies, emeralds, and fine jewelry from Alpha Imports.",
+    "Discover premium natural diamonds, certified gemstones, sapphires, rubies, emeralds, and luxury fine jewelry collections crafted for elegance and trust.",
 
   keywords: [
     "diamonds",
@@ -36,22 +39,22 @@ export const metadata: Metadata = {
   },
 
   alternates: {
-    canonical: "https://alphaimports.com",
+    canonical: BASE_URL,
   },
 
   openGraph: {
     type: "website",
-    url: "https://alphaimports.com",
+    url: BASE_URL,
     siteName: "Alpha Imports",
     title: "Alpha Imports | Fine Diamonds, Gemstones & Jewelry",
     description:
-      "Premium diamonds, gemstones, and luxury jewelry collections.",
+      "Discover premium natural diamonds, certified gemstones, sapphires, rubies, emeralds, and luxury fine jewelry collections crafted for elegance and trust.",
     images: [
       {
-        url: "/og-image.png",
+        url: `${BASE_URL}/og-image.png`,
         width: 1200,
         height: 630,
-        alt: "Alpha Imports",
+        alt: "Alpha Imports - Fine Diamonds & Gemstones",
       },
     ],
   },
@@ -60,8 +63,8 @@ export const metadata: Metadata = {
     card: "summary_large_image",
     title: "Alpha Imports | Fine Diamonds, Gemstones & Jewelry",
     description:
-      "Premium diamonds, gemstones, and luxury jewelry collections.",
-    images: ["/og-image.png"],
+      "Discover premium natural diamonds, certified gemstones, sapphires, rubies, emeralds, and luxury fine jewelry collections crafted for elegance and trust.",
+    images: [`${BASE_URL}/og-image.png`],
   },
 
   icons: {
@@ -87,7 +90,6 @@ export default function RootLayout({
           crossOrigin="anonymous"
         />
 
-        {/* Structured Data */}
         <script
           type="application/ld+json"
           dangerouslySetInnerHTML={{
@@ -95,9 +97,10 @@ export default function RootLayout({
               "@context": "https://schema.org",
               "@type": "JewelryStore",
               name: "Alpha Imports",
-              url: "https://alphaimports.com",
+              url: BASE_URL,
+              image: `${BASE_URL}/og-image.png`,
               description:
-                "Premium diamonds, gemstones and fine jewelry.",
+                "Premium diamonds, gemstones and fine jewelry collections.",
             }),
           }}
         />
