@@ -6,6 +6,7 @@ export interface ICategory extends Document {
   slug: string;
   description?: string;
   isActive: boolean;
+  sortOrder: number;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -27,14 +28,15 @@ const CategorySchema = new Schema<ICategory>(
     },
     description: { type: String, trim: true },
     isActive: { type: Boolean, default: true },
+    sortOrder: { type: Number, default: 0 },
   },
   { timestamps: true }
 );
 
 CategorySchema.index({ slug: 1 }, { unique: true });
 CategorySchema.index({ isActive: 1 });
+CategorySchema.index({ sortOrder: 1 });
 
-// ✅ Safe for Next.js hot-reload: checks global registry before registering
 const Category = (() => {
   if (mongoose.models && mongoose.models.Category) {
     return mongoose.models.Category as mongoose.Model<ICategory>;

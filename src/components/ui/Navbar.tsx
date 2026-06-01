@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { useState, useEffect, useRef } from "react";
 import { useCart } from "@/hooks/useCart";
 import SearchBar from "./SearchBar";
-import CartSidebar from "./CartSidebar"; // ← NEW
+import CartSidebar from "./CartSidebar";
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -21,6 +21,7 @@ interface NavCategory {
   name: string;
   slug: string;
   isActive?: boolean;
+  sortOrder?: number;
   subcategories: NavSubcategory[];
 }
 
@@ -31,21 +32,30 @@ function useNavCategories(initialCategories: NavCategory[]) {
   const [loading, setLoading] = useState(initialCategories.length === 0);
 
   useEffect(() => {
-    if (initialCategories.length > 0) return;
+    // always re-fetch so sortOrder changes are reflected on next page load
     let cancelled = false;
-    fetch("/api/categories?withSubcategories=true")
+    setLoading(true);
+    fetch("/api/categories?withSubcategories=true", { cache: "no-store" })
       .then((r) => r.json())
       .then((data) => {
         if (cancelled) return;
         const list: NavCategory[] = Array.isArray(data) ? data : (data?.data ?? []);
-        setCategories(
-          list
-            .filter((c) => c.isActive !== false)
-            .map((c) => ({
-              ...c,
-              subcategories: (c.subcategories ?? []).filter((s) => s.isActive !== false),
-            }))
-        );
+        const filtered = list
+          .filter((c) => c.isActive !== false)
+          .map((c) => ({
+            ...c,
+            subcategories: (c.subcategories ?? []).filter((s) => s.isActive !== false),
+          }));
+
+        // sort client-side by sortOrder as well, so even if the server
+        // returns them in a different order the navbar always matches
+        filtered.sort((a, b) => {
+          const sa = a.sortOrder ?? 0;
+          const sb = b.sortOrder ?? 0;
+          return sa !== sb ? sa - sb : a.name.localeCompare(b.name);
+        });
+
+        setCategories(filtered);
       })
       .catch(() => {})
       .finally(() => { if (!cancelled) setLoading(false); });
@@ -72,7 +82,6 @@ export default function Navbar({ initialCategories = [] }: { initialCategories?:
   const [openDropdown, setOpenDropdown] = useState<string | null>(null);
   const [expandedDropdowns, setExpandedDropdowns] = useState<Set<string>>(new Set());
 
-  // ── NEW: cart sidebar state ────────────────────────────────────────────────
   const [cartOpen, setCartOpen] = useState(false);
 
   const profileRef = useRef<HTMLDivElement>(null);
@@ -145,7 +154,6 @@ export default function Navbar({ initialCategories = [] }: { initialCategories?:
     router.push("/");
   };
 
-  // ── Cart icon button (shared style) ───────────────────────────────────────
   const CartIconButton = ({ mobile = false }: { mobile?: boolean }) => (
     <button
       onClick={() => { setMenuOpen(false); setCartOpen(true); }}
@@ -421,9 +429,7 @@ export default function Navbar({ initialCategories = [] }: { initialCategories?:
                     </div>
                   </div>
 
-                  {/* ── Desktop Cart Button (opens sidebar) ── */}
                   <CartIconButton />
-
                   <a href="/orders" className="nav-toplink">Orders</a>
                 </>
               ) : (
@@ -487,10 +493,7 @@ export default function Navbar({ initialCategories = [] }: { initialCategories?:
 
           {/* Mobile: Cart icon + Hamburger */}
           <div className="flex md:hidden items-center gap-3">
-            {user && (
-              // ── Mobile Cart Button (opens sidebar) ──
-              <CartIconButton mobile />
-            )}
+            {user && <CartIconButton mobile />}
             <button onClick={() => setMenuOpen(!menuOpen)} aria-label="Toggle menu" style={{
               background: "transparent", border: "none", cursor: "pointer",
               padding: "6px", display: "flex", flexDirection: "column",
@@ -726,7 +729,6 @@ export default function Navbar({ initialCategories = [] }: { initialCategories?:
           {/* Auth links */}
           {user ? (
             <>
-              {/* ── Mobile Cart: opens sidebar (not a link) ── */}
               <button onClick={() => { setMenuOpen(false); setCartOpen(true); }} style={{
                 display: "flex", alignItems: "center", justifyContent: "space-between",
                 padding: "15px 0", fontSize: "15px", fontWeight: 500, color: "#1a1a2e",
@@ -834,7 +836,7 @@ export default function Navbar({ initialCategories = [] }: { initialCategories?:
         </div>
       </div>
 
-      {/* ── Cart Sidebar ── NEW */}
+      {/* ── Cart Sidebar ── */}
       <CartSidebar open={cartOpen} onClose={() => setCartOpen(false)} />
     </>
   );

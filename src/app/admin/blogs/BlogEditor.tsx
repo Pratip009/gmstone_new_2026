@@ -1,11 +1,22 @@
 'use client';
 import { useState, useRef } from 'react';
 import { useRouter } from 'next/navigation';
+import dynamic from 'next/dynamic';
 import {
   Image as ImageIcon, X, Tag, Plus, AlertCircle, Save, Send,
   ChevronDown, ChevronUp, Loader2
 } from 'lucide-react';
 import { useAuthFetch } from '@/hooks/useAuthFetch';
+
+// Dynamically import to avoid SSR hydration issues with TipTap
+const RichTextEditor = dynamic(() => import('@/components/editor/RichTextEditor'), {
+  ssr: false,
+  loading: () => (
+    <div className="border border-[#ede9e1] rounded-xl bg-white min-h-[420px] flex items-center justify-center">
+      <Loader2 size={20} className="text-[#c9a84c] animate-spin" />
+    </div>
+  ),
+});
 
 export interface BlogFormData {
   title: string;
@@ -22,7 +33,7 @@ export interface BlogFormData {
 
 interface BlogEditorProps {
   initialData?: Partial<BlogFormData>;
-  blogId?: string;     // when editing
+  blogId?: string;
   isEdit?: boolean;
 }
 
@@ -53,15 +64,15 @@ export default function BlogEditor({ initialData, blogId, isEdit }: BlogEditorPr
     status:           initialData?.status           ?? 'draft',
   });
 
-  const [tagInput, setTagInput]     = useState('');
-  const [uploading, setUploading]   = useState(false);
-  const [saving, setSaving]         = useState(false);
-  const [errors, setErrors]         = useState<Record<string, string>>({});
-  const [seoOpen, setSeoOpen]       = useState(false);
+  const [tagInput, setTagInput]   = useState('');
+  const [uploading, setUploading] = useState(false);
+  const [saving, setSaving]       = useState(false);
+  const [errors, setErrors]       = useState<Record<string, string>>({});
+  const [seoOpen, setSeoOpen]     = useState(false);
 
   const update = (field: keyof BlogFormData, value: unknown) => {
     setForm(prev => ({ ...prev, [field]: value }));
-    if (errors[field]) setErrors(prev => { const n = {...prev}; delete n[field]; return n; });
+    if (errors[field]) setErrors(prev => { const n = { ...prev }; delete n[field]; return n; });
   };
 
   const handleTitleChange = (title: string) => {
@@ -77,7 +88,8 @@ export default function BlogEditor({ initialData, blogId, isEdit }: BlogEditorPr
 
   const removeTag = (tag: string) => update('tags', form.tags.filter(t => t !== tag));
 
-  const uploadImage = async (file: File) => {
+  // Upload image for the featured image field
+  const uploadFeaturedImage = async (file: File) => {
     if (!file.type.startsWith('image/')) { alert('Please select an image file'); return; }
     setUploading(true);
     const fd = new FormData();
@@ -88,11 +100,20 @@ export default function BlogEditor({ initialData, blogId, isEdit }: BlogEditorPr
     setUploading(false);
   };
 
+  // Upload image inside the rich text editor
+  const uploadEditorImage = async (file: File): Promise<string> => {
+    const fd = new FormData();
+    fd.append('files', file);
+    const res = await authFetch('/api/admin/upload', { method: 'POST', headers: {}, body: fd });
+    const d = await res.json();
+    return d.success ? d.urls[0] : '';
+  };
+
   const validate = (): boolean => {
     const errs: Record<string, string> = {};
     if (!form.title.trim())            errs.title = 'Title is required';
     if (!form.shortDescription.trim()) errs.shortDescription = 'Short description is required';
-    if (!form.content.trim())          errs.content = 'Content is required';
+    if (!form.content.trim() || form.content === '<p></p>') errs.content = 'Content is required';
     if (!form.category)                errs.category = 'Category is required';
     setErrors(errs);
     return Object.keys(errs).length === 0;
@@ -119,7 +140,6 @@ export default function BlogEditor({ initialData, blogId, isEdit }: BlogEditorPr
 
   return (
     <div className="space-y-6">
-      {/* Main grid */}
       <div className="grid grid-cols-1 xl:grid-cols-[1fr_320px] gap-6">
 
         {/* ── Left: Main content ── */}
@@ -141,7 +161,11 @@ export default function BlogEditor({ initialData, blogId, isEdit }: BlogEditorPr
                   : 'border-[#ede9e1] focus:border-[#c9a84c]/60 focus:ring-1 focus:ring-[#c9a84c]/20'
               }`}
             />
-            {errors.title && <p className="mt-1 text-[0.65rem] text-red-500 flex items-center gap-1"><AlertCircle size={11} />{errors.title}</p>}
+            {errors.title && (
+              <p className="mt-1 text-[0.65rem] text-red-500 flex items-center gap-1">
+                <AlertCircle size={11} />{errors.title}
+              </p>
+            )}
           </div>
 
           {/* Slug */}
@@ -177,34 +201,38 @@ export default function BlogEditor({ initialData, blogId, isEdit }: BlogEditorPr
               }`}
             />
             <div className="flex justify-between mt-1">
-              {errors.shortDescription && <p className="text-[0.65rem] text-red-500 flex items-center gap-1"><AlertCircle size={11} />{errors.shortDescription}</p>}
+              {errors.shortDescription && (
+                <p className="text-[0.65rem] text-red-500 flex items-center gap-1">
+                  <AlertCircle size={11} />{errors.shortDescription}
+                </p>
+              )}
               <p className="ml-auto text-[0.62rem] text-[#c4bdb2]">{form.shortDescription.length}/500</p>
             </div>
           </div>
 
-          {/* Content */}
+          {/* ── Rich Text Editor ── */}
           <div>
             <label className="block text-[0.68rem] tracking-[0.15em] uppercase text-[#a09a90] font-semibold mb-2">
               Content <span className="text-red-400">*</span>
-              <span className="ml-2 text-[0.6rem] text-[#b0a898] normal-case tracking-normal">(HTML supported)</span>
             </label>
-            <textarea
+            <RichTextEditor
               value={form.content}
-              onChange={e => update('content', e.target.value)}
-              placeholder="Write your article here. You can use HTML tags like <h2>, <p>, <strong>, <em>, <ul>, <blockquote>…"
-              rows={20}
-              className={`w-full px-4 py-3 text-[0.82rem] font-mono border rounded-xl outline-none resize-y bg-white transition-all placeholder:text-[#c4bdb2] leading-relaxed ${
-                errors.content
-                  ? 'border-red-300'
-                  : 'border-[#ede9e1] focus:border-[#c9a84c]/60 focus:ring-1 focus:ring-[#c9a84c]/20'
-              }`}
+              onChange={val => update('content', val)}
+              placeholder="Write your article here…"
+              onImageUpload={uploadEditorImage}
+              error={!!errors.content}
             />
-            {errors.content && <p className="mt-1 text-[0.65rem] text-red-500 flex items-center gap-1"><AlertCircle size={11} />{errors.content}</p>}
+            {errors.content && (
+              <p className="mt-1 text-[0.65rem] text-red-500 flex items-center gap-1">
+                <AlertCircle size={11} />{errors.content}
+              </p>
+            )}
           </div>
 
           {/* SEO (collapsible) */}
           <div className="border border-[#ede9e1] rounded-xl overflow-hidden">
             <button
+              type="button"
               onClick={() => setSeoOpen(o => !o)}
               className="w-full flex items-center justify-between px-4 py-3 bg-[#faf9f7] hover:bg-[#f5f3ef] transition-colors"
             >
@@ -246,6 +274,7 @@ export default function BlogEditor({ initialData, blogId, isEdit }: BlogEditorPr
             <h3 className="text-[0.68rem] tracking-[0.15em] uppercase text-[#a09a90] font-semibold mb-4">Publish</h3>
             <div className="space-y-2">
               <button
+                type="button"
                 onClick={() => handleSave('published')}
                 disabled={saving}
                 className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-[#c9a84c] text-white text-[0.75rem] font-semibold rounded-lg hover:bg-[#b8933b] disabled:opacity-50 transition-colors"
@@ -254,6 +283,7 @@ export default function BlogEditor({ initialData, blogId, isEdit }: BlogEditorPr
                 Publish Now
               </button>
               <button
+                type="button"
                 onClick={() => handleSave('draft')}
                 disabled={saving}
                 className="w-full flex items-center justify-center gap-2 px-4 py-2.5 border border-[#ede9e1] text-[#5c5852] text-[0.75rem] font-semibold rounded-lg hover:bg-[#f5f3ef] disabled:opacity-50 transition-colors"
@@ -280,6 +310,7 @@ export default function BlogEditor({ initialData, blogId, isEdit }: BlogEditorPr
               {BLOG_CATEGORIES.map(cat => (
                 <button
                   key={cat}
+                  type="button"
                   onClick={() => update('category', cat)}
                   className={`px-2.5 py-2 text-[0.65rem] rounded-lg border text-left transition-all ${
                     form.category === cat
@@ -291,7 +322,11 @@ export default function BlogEditor({ initialData, blogId, isEdit }: BlogEditorPr
                 </button>
               ))}
             </div>
-            {errors.category && <p className="mt-2 text-[0.65rem] text-red-500 flex items-center gap-1"><AlertCircle size={11} />{errors.category}</p>}
+            {errors.category && (
+              <p className="mt-2 text-[0.65rem] text-red-500 flex items-center gap-1">
+                <AlertCircle size={11} />{errors.category}
+              </p>
+            )}
           </div>
 
           {/* Featured Image */}
@@ -303,6 +338,7 @@ export default function BlogEditor({ initialData, blogId, isEdit }: BlogEditorPr
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img src={form.featuredImage} alt="Featured" className="w-full h-36 object-cover rounded-lg" />
                 <button
+                  type="button"
                   onClick={() => update('featuredImage', '')}
                   className="absolute top-2 right-2 w-6 h-6 bg-black/60 text-white rounded-full flex items-center justify-center hover:bg-black/80 transition-colors"
                 >
@@ -311,6 +347,7 @@ export default function BlogEditor({ initialData, blogId, isEdit }: BlogEditorPr
               </div>
             ) : (
               <button
+                type="button"
                 onClick={() => fileRef.current?.click()}
                 disabled={uploading}
                 className="w-full h-28 border-2 border-dashed border-[#ede9e1] rounded-lg flex flex-col items-center justify-center gap-2 hover:border-[#c9a84c]/40 hover:bg-[#faf9f7] transition-all"
@@ -322,7 +359,6 @@ export default function BlogEditor({ initialData, blogId, isEdit }: BlogEditorPr
               </button>
             )}
 
-            {/* URL input */}
             <input
               type="text"
               value={form.featuredImage}
@@ -336,7 +372,7 @@ export default function BlogEditor({ initialData, blogId, isEdit }: BlogEditorPr
               type="file"
               accept="image/*"
               className="hidden"
-              onChange={e => { const f = e.target.files?.[0]; if (f) uploadImage(f); e.target.value = ''; }}
+              onChange={e => { const f = e.target.files?.[0]; if (f) uploadFeaturedImage(f); e.target.value = ''; }}
             />
           </div>
 
@@ -347,7 +383,7 @@ export default function BlogEditor({ initialData, blogId, isEdit }: BlogEditorPr
               {form.tags.map(tag => (
                 <span key={tag} className="flex items-center gap-1 px-2 py-0.5 bg-[#f5f3ef] text-[#8a8278] text-[0.65rem] rounded-full border border-[#ede9e1]">
                   #{tag}
-                  <button onClick={() => removeTag(tag)} className="text-[#b0a898] hover:text-red-400 transition-colors">
+                  <button type="button" onClick={() => removeTag(tag)} className="text-[#b0a898] hover:text-red-400 transition-colors">
                     <X size={9} />
                   </button>
                 </span>
@@ -366,6 +402,7 @@ export default function BlogEditor({ initialData, blogId, isEdit }: BlogEditorPr
                 />
               </div>
               <button
+                type="button"
                 onClick={addTag}
                 className="w-8 h-8 bg-[#f5f3ef] rounded-lg flex items-center justify-center hover:bg-[#ede9e1] transition-colors"
               >

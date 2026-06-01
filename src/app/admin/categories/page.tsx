@@ -4,12 +4,12 @@ import { useApi } from '@/hooks/useApi';
 import {
   Plus, Tag, Layers, CheckCircle2, AlertCircle,
   Search, Trash2, ChevronRight, FolderOpen, Folder, FileDown,
-  ImagePlus, X, Upload, Pencil,
+  ImagePlus, X, Upload, Pencil, GripVertical,
   Bold, Italic, List, ListOrdered, Heading2, Heading3,
   Quote, Minus, RotateCcw, RotateCw, Link, AlignLeft,
 } from 'lucide-react';
 
-interface Category    { _id: string; name: string; slug: string; description?: string; }
+interface Category    { _id: string; name: string; slug: string; description?: string; sortOrder?: number; }
 interface Subcategory {
   _id: string; name: string; slug: string;
   category: { _id: string; name: string };
@@ -27,7 +27,6 @@ function RichEditor({ value, onChange, placeholder }: RichEditorProps) {
   const editorRef = useRef<HTMLDivElement>(null);
   const isInternalUpdate = useRef(false);
 
-  // Sync external value → DOM (only when not typing)
   useEffect(() => {
     if (!editorRef.current) return;
     if (isInternalUpdate.current) { isInternalUpdate.current = false; return; }
@@ -109,7 +108,6 @@ function RichEditor({ value, onChange, placeholder }: RichEditorProps) {
         className="rich-editor-body min-h-[220px] max-h-[360px] overflow-y-auto px-4 py-3 text-[0.85rem] text-[#1a1714] leading-relaxed outline-none"
       />
 
-      {/* Prose styles injected via <style> */}
       <style>{`
         .rich-editor-body:empty:before {
           content: attr(data-placeholder);
@@ -324,21 +322,28 @@ export default function AdminCategoriesPage() {
   const [subPreview, setSubPreview] = useState<string | null>(null);
   const subImageRef = useRef<HTMLInputElement>(null);
 
-  const [loading,   setLoading]   = useState(false);
+  const [loading,     setLoading]     = useState(false);
   const [editLoading, setEditLoading] = useState(false);
-  const [msg,       setMsg]       = useState<{ text: string; type: 'success' | 'error' } | null>(null);
-  const [search,    setSearch]    = useState('');
-  const [subSearch, setSubSearch] = useState('');
+  const [msg,         setMsg]         = useState<{ text: string; type: 'success' | 'error' } | null>(null);
+  const [search,      setSearch]      = useState('');
+  const [subSearch,   setSubSearch]   = useState('');
 
   // modals
-  const [deletingCat,  setDeletingCat]  = useState<string | null>(null);
-  const [deletingSub,  setDeletingSub]  = useState<string | null>(null);
-  const [editingCat,   setEditingCat]   = useState<Category | null>(null);
+  const [deletingCat,   setDeletingCat]   = useState<string | null>(null);
+  const [deletingSub,   setDeletingSub]   = useState<string | null>(null);
+  const [editingCat,    setEditingCat]    = useState<Category | null>(null);
   const [uploadingSub,  setUploadingSub]  = useState<string | null>(null);
   const [uploadFile,    setUploadFile]    = useState<File | null>(null);
   const [uploadPreview, setUploadPreview] = useState<string | null>(null);
   const [uploadLoading, setUploadLoading] = useState(false);
   const uploadInputRef = useRef<HTMLInputElement>(null);
+
+  // drag-and-drop state
+  const dragCatRef     = useRef<string | null>(null);
+  const dragOverCatRef = useRef<string | null>(null);
+  const [draggingCatId,  setDraggingCatId]  = useState<string | null>(null);
+  const [dragOverCatId,  setDragOverCatId]  = useState<string | null>(null);
+  const [reorderSaving, setReorderSaving]   = useState(false);
 
   // ── fetch ──────────────────────────────────────────────────────────────────
   const fetchAll = async () => {
@@ -479,6 +484,62 @@ export default function AdminCategoriesPage() {
     } finally { setEditLoading(false); }
   };
 
+  // ── reorder categories ─────────────────────────────────────────────────────
+  const reorderCategories = async (newOrder: Category[]) => {
+    setCategories(newOrder); // optimistic update
+    setReorderSaving(true);
+    try {
+      await apiFetch('/api/admin/categories/reorder', {
+        method: 'PATCH',
+        body: JSON.stringify({ orderedIds: newOrder.map(c => c._id) }),
+      });
+    } catch (err) {
+      flash('Failed to save order', 'error');
+      fetchAll(); // revert on error
+    } finally { setReorderSaving(false); }
+  };
+
+  // ── drag handlers ──────────────────────────────────────────────────────────
+  const handleDragStart = (catId: string) => {
+    dragCatRef.current = catId;
+    setDraggingCatId(catId);
+  };
+
+  const handleDragEnd = () => {
+    setDraggingCatId(null);
+    setDragOverCatId(null);
+    dragCatRef.current = null;
+    dragOverCatRef.current = null;
+  };
+
+  const handleDragOver = (e: React.DragEvent, catId: string) => {
+    e.preventDefault();
+    if (dragCatRef.current === catId) return;
+    dragOverCatRef.current = catId;
+    setDragOverCatId(catId);
+  };
+
+  const handleDragLeave = () => {
+    setDragOverCatId(null);
+  };
+
+  const handleDrop = (e: React.DragEvent, targetId: string) => {
+    e.preventDefault();
+    const sourceId = dragCatRef.current;
+    if (!sourceId || sourceId === targetId) return;
+
+    const from = categories.findIndex(c => c._id === sourceId);
+    const to   = categories.findIndex(c => c._id === targetId);
+    if (from === -1 || to === -1) return;
+
+    const reordered = [...categories];
+    const [moved] = reordered.splice(from, 1);
+    reordered.splice(to, 0, moved);
+
+    setDragOverCatId(null);
+    reorderCategories(reordered);
+  };
+
   // ── upload image to existing subcategory ───────────────────────────────────
   const submitUploadImage = async () => {
     if (!uploadFile || !uploadingSub) return;
@@ -585,7 +646,16 @@ export default function AdminCategoriesPage() {
         {/* ══ COL 1 — Category list ══ */}
         <div className="bg-white border border-[#ede9e1] rounded-2xl overflow-hidden flex flex-col">
           <div className="px-4 pt-4 pb-3 border-b border-[#f0ece4]">
-            <p className="text-[0.68rem] font-bold tracking-[0.1em] uppercase text-[#a09a90] mb-3">Categories</p>
+            <div className="flex items-center justify-between mb-3">
+              <p className="text-[0.68rem] font-bold tracking-[0.1em] uppercase text-[#a09a90]">Categories</p>
+              {/* Reorder saving indicator */}
+              {reorderSaving && (
+                <span className="flex items-center gap-1.5 text-[0.62rem] text-[#c9a84c]">
+                  <span className="w-2.5 h-2.5 rounded-full border-2 border-[#c9a84c]/30 border-t-[#c9a84c] animate-spin" />
+                  Saving order…
+                </span>
+              )}
+            </div>
             <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-[#faf9f6] border border-[#e8e3db]">
               <Search size={12} strokeWidth={1.8} className="text-[#c8c2b8]" />
               <input
@@ -595,30 +665,75 @@ export default function AdminCategoriesPage() {
                 onChange={e => setSearch(e.target.value)}
               />
             </div>
+            {/* Drag hint — shown when no search active and >1 categories */}
+            {!search && categories.length > 1 && (
+              <p className="mt-2 text-[0.62rem] text-[#c8c2b8] flex items-center gap-1">
+                <GripVertical size={10} strokeWidth={2} />
+                Drag to reorder
+              </p>
+            )}
           </div>
+
           <ul className="overflow-y-auto flex-1 py-1.5" style={{ maxHeight: '480px' }}>
             {filteredCats.length === 0 ? (
               <li className="px-4 py-8 text-center text-[0.75rem] text-[#c8c2b8]">
                 {search ? 'No results.' : 'No categories yet.'}
               </li>
             ) : filteredCats.map(cat => {
-              const isActive = selectedCat === cat._id;
-              const count    = subCount(cat._id);
+              const isActive    = selectedCat === cat._id;
+              const isDragging  = draggingCatId === cat._id;
+              const isDragOver  = dragOverCatId === cat._id && draggingCatId !== cat._id;
+              const count       = subCount(cat._id);
+
               return (
-                <li key={cat._id} className="px-2">
+                <li
+                  key={cat._id}
+                  className="px-2"
+                  draggable={!search} // disable drag when searching (filtered list)
+                  onDragStart={() => handleDragStart(cat._id)}
+                  onDragEnd={handleDragEnd}
+                  onDragOver={e => handleDragOver(e, cat._id)}
+                  onDragLeave={handleDragLeave}
+                  onDrop={e => handleDrop(e, cat._id)}
+                >
+                  {/* Drop indicator line — shown above when dragging over */}
+                  {isDragOver && (
+                    <div className="h-0.5 mx-1 rounded-full bg-[#c9a84c] mb-0.5 transition-all" />
+                  )}
+
                   <div
-                    className={`group flex items-center gap-2.5 px-3 py-2.5 rounded-xl cursor-pointer transition-all duration-150
-                      ${isActive ? 'bg-[#1a1714] shadow-sm' : 'hover:bg-[#f7f5f1]'}`}
+                    className={`group flex items-center gap-2 px-2 py-2.5 rounded-xl cursor-pointer transition-all duration-150
+                      ${isActive ? 'bg-[#1a1714] shadow-sm' : 'hover:bg-[#f7f5f1]'}
+                      ${isDragging ? 'opacity-40 scale-[0.98]' : ''}
+                    `}
                     onClick={() => { setSelectedCat(cat._id); setSubSearch(''); }}
                   >
+                    {/* ── Drag handle ── */}
+                    {!search && (
+                      <span
+                        title="Drag to reorder"
+                        className={`flex-shrink-0 cursor-grab active:cursor-grabbing transition-opacity
+                          opacity-0 group-hover:opacity-100
+                          ${isActive ? 'text-white/30 hover:text-white/60' : 'text-[#c8c2b8] hover:text-[#a09a90]'}`}
+                        onMouseDown={e => e.stopPropagation()}
+                      >
+                        <GripVertical size={13} strokeWidth={1.8} />
+                      </span>
+                    )}
+
+                    {/* Folder icon */}
                     <span className={`flex-shrink-0 ${isActive ? 'text-[#c9a84c]' : 'text-[#c9a84c]/70'}`}>
                       {isActive ? <FolderOpen size={15} strokeWidth={1.6} /> : <Folder size={15} strokeWidth={1.6} />}
                     </span>
+
+                    {/* Name */}
                     <span className={`flex-1 text-[0.825rem] font-medium truncate ${isActive ? 'text-white' : 'text-[#1a1714]'}`}>
                       {cat.name}
                     </span>
+
+                    {/* Sub count badge */}
                     {count > 0 && (
-                      <span className={`text-[0.62rem] font-bold px-1.5 py-0.5 rounded-full
+                      <span className={`text-[0.62rem] font-bold px-1.5 py-0.5 rounded-full flex-shrink-0
                         ${isActive ? 'bg-white/15 text-white' : 'bg-[#c9a84c]/12 text-[#c9a84c]'}`}>
                         {count}
                       </span>
@@ -628,7 +743,7 @@ export default function AdminCategoriesPage() {
                     <button
                       onClick={e => { e.stopPropagation(); setEditingCat(cat); }}
                       title="Edit category"
-                      className={`opacity-0 group-hover:opacity-100 transition-opacity p-1 rounded-lg
+                      className={`opacity-0 group-hover:opacity-100 transition-opacity p-1 rounded-lg flex-shrink-0
                         ${isActive
                           ? 'text-white/40 hover:text-[#c9a84c] hover:bg-white/10'
                           : 'text-[#c8c2b8] hover:bg-[#fdf9f0] hover:text-[#c9a84c]'}`}
@@ -639,7 +754,7 @@ export default function AdminCategoriesPage() {
                     {/* Delete button */}
                     <button
                       onClick={e => { e.stopPropagation(); setDeletingCat(cat._id); }}
-                      className={`opacity-0 group-hover:opacity-100 transition-opacity p-1 rounded-lg
+                      className={`opacity-0 group-hover:opacity-100 transition-opacity p-1 rounded-lg flex-shrink-0
                         ${isActive
                           ? 'text-white/30 hover:text-red-400 hover:bg-white/10'
                           : 'text-[#c8c2b8] hover:bg-red-50 hover:text-red-400'}`}

@@ -81,9 +81,9 @@ function extractHeadings(html: string): { id: string; text: string; level: numbe
 
 function injectHeadingIds(html: string): string {
   let i = 0;
-  return html.replace(/<h([2-3])([^>]*)>/gi, () => {
+  return html.replace(/<h([2-3])([^>]*)>/gi, (_match, level, attrs) => {
     const id = `heading-${i++}`;
-    return `<h${arguments[1]} id="${id}"${arguments[2]}>`;
+    return `<h${level} id="${id}"${attrs}>`;
   });
 }
 
@@ -102,7 +102,7 @@ function ReadingProgressBar() {
     return () => window.removeEventListener('scroll', onScroll);
   }, []);
   return (
-    <div className="fixed top-0 left-0 right-0 z-50 h-[3px] bg-transparent">
+    <div className="fixed top-0 left-0 right-0 z-50 h-[3px] bg-transparent pointer-events-none">
       <div
         className="h-full bg-gradient-to-r from-[#c9a84c] to-[#e8d08a] transition-all duration-100"
         style={{ width: `${progress}%` }}
@@ -134,7 +134,7 @@ function TableOfContents({ headings }: { headings: { id: string; text: string; l
   if (headings.length === 0) return null;
 
   return (
-    <div className="bg-[#faf9f7] border border-[#ede9e1] rounded-xl p-4 sticky top-20">
+    <div className="bg-[#faf9f7] border border-[#ede9e1] rounded-xl p-4">
       <div className="flex items-center gap-2 mb-3">
         <List size={13} strokeWidth={2} className="text-[#c9a84c]" />
         <span className="text-[0.68rem] font-semibold tracking-[0.15em] uppercase text-[#a09a90]">Contents</span>
@@ -156,6 +156,74 @@ function TableOfContents({ headings }: { headings: { id: string; text: string; l
           </button>
         ))}
       </nav>
+    </div>
+  );
+}
+
+// ─── Related Articles Sidebar Card ───────────────────────────────────────────
+
+function RelatedArticlesSidebar({ related, currentSlug }: { related: RelatedBlog[]; currentSlug: string }) {
+  const articles = related.filter(b => b.slug !== currentSlug).slice(0, 4);
+  if (articles.length === 0) return null;
+
+  return (
+    <div className="bg-white border border-[#ede9e1] rounded-xl overflow-hidden">
+      {/* Header */}
+      <div className="px-4 pt-4 pb-3 border-b border-[#f5f3ef] flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <BookOpen size={13} strokeWidth={2} className="text-[#c9a84c]" />
+          <span className="text-[0.68rem] font-semibold tracking-[0.15em] uppercase text-[#a09a90]">Related</span>
+        </div>
+        <Link
+          href="/blogs"
+          className="text-[0.62rem] text-[#c9a84c] hover:underline font-semibold flex items-center gap-0.5"
+        >
+          All <ChevronRight size={10} strokeWidth={2.5} />
+        </Link>
+      </div>
+
+      {/* Articles */}
+      <div className="divide-y divide-[#f5f3ef]">
+        {articles.map(b => (
+          <Link
+            key={b._id}
+            href={`/blogs/${b.slug}`}
+            className="group flex gap-3 p-3 hover:bg-[#faf9f7] transition-colors"
+          >
+            {/* Thumbnail */}
+            <div className="relative w-16 h-14 shrink-0 rounded-lg overflow-hidden bg-[#f5f3ef]">
+              {b.featuredImage ? (
+                <Image
+                  src={b.featuredImage}
+                  alt={b.title}
+                  fill
+                  className="object-cover group-hover:scale-105 transition-transform duration-300"
+                  sizes="64px"
+                />
+              ) : (
+                <div className="w-full h-full flex items-center justify-center">
+                  <BookOpen size={14} className="text-[#d4cfc8]" />
+                </div>
+              )}
+            </div>
+
+            {/* Text */}
+            <div className="flex-1 min-w-0">
+              <span className="block text-[0.55rem] tracking-widest uppercase text-[#c9a84c] font-semibold mb-0.5">
+                {b.category}
+              </span>
+              <h4 className="text-[0.75rem] font-semibold text-[#1a1714] leading-snug line-clamp-2 group-hover:text-[#8a6e2a] transition-colors font-['Cormorant_Garamond',serif]">
+                {b.title}
+              </h4>
+              {b.publishedAt && (
+                <span className="text-[0.6rem] text-[#b0a898] mt-1 block">
+                  {new Date(b.publishedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                </span>
+              )}
+            </div>
+          </Link>
+        ))}
+      </div>
     </div>
   );
 }
@@ -215,7 +283,6 @@ function CommentItem({
   return (
     <div className="py-4 border-b border-[#f5f3ef] last:border-0">
       <div className="flex items-start gap-3">
-        {/* Avatar */}
         <div className="w-8 h-8 rounded-full bg-[#c9a84c]/15 border border-[#c9a84c]/20 flex items-center justify-center shrink-0">
           <span className="text-[0.7rem] font-bold text-[#c9a84c]">{comment.userName.charAt(0).toUpperCase()}</span>
         </div>
@@ -249,14 +316,10 @@ function CommentItem({
             <p className="text-[0.78rem] text-[#5c5852] leading-relaxed">{comment.message}</p>
           )}
 
-          {/* Actions */}
           {!editing && (
             <div className="flex items-center gap-3 mt-2">
               {(isAdmin || currentUserId) && (
-                <button
-                  onClick={() => setReplying(!replying)}
-                  className="text-[0.65rem] text-[#a09a90] hover:text-[#c9a84c] transition-colors"
-                >
+                <button onClick={() => setReplying(!replying)} className="text-[0.65rem] text-[#a09a90] hover:text-[#c9a84c] transition-colors">
                   Reply
                 </button>
               )}
@@ -273,7 +336,6 @@ function CommentItem({
             </div>
           )}
 
-          {/* Reply box */}
           {replying && (
             <div className="mt-3 flex gap-2">
               <input
@@ -290,7 +352,6 @@ function CommentItem({
             </div>
           )}
 
-          {/* Replies */}
           {comment.replies.length > 0 && (
             <div className="mt-3 pl-4 border-l-2 border-[#ede9e1] space-y-3">
               {comment.replies.map(reply => (
@@ -333,20 +394,19 @@ export default function BlogDetailPage() {
   const { user, token } = useAuth();
   const authFetch = useAuthFetch();
 
-  const [blog, setBlog]       = useState<Blog | null>(null);
-  const [related, setRelated] = useState<RelatedBlog[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [blog, setBlog]         = useState<Blog | null>(null);
+  const [related, setRelated]   = useState<RelatedBlog[]>([]);
+  const [loading, setLoading]   = useState(true);
   const [notFound, setNotFound] = useState(false);
 
-  const [liked, setLiked]       = useState(false);
+  const [liked, setLiked]           = useState(false);
   const [likesCount, setLikesCount] = useState(0);
-  const [commentText, setCommentText] = useState('');
+  const [commentText, setCommentText]       = useState('');
   const [commentLoading, setCommentLoading] = useState(false);
-  const [copied, setCopied]     = useState(false);
+  const [copied, setCopied]         = useState(false);
 
   const contentRef = useRef<HTMLDivElement>(null);
 
-  // Fetch blog
   const fetchBlog = useCallback(() => {
     fetch(`/api/blogs/${slug}`)
       .then(r => r.json())
@@ -362,12 +422,16 @@ export default function BlogDetailPage() {
 
   useEffect(() => { fetchBlog(); }, [fetchBlog]);
 
-  // Fetch related
+  // Fetch related blogs (same category, exclude current)
   useEffect(() => {
     if (!blog) return;
-    fetch(`/api/blogs?category=${blog.category}&limit=4`)
+    fetch(`/api/blogs?category=${encodeURIComponent(blog.category)}&limit=5`)
       .then(r => r.json())
-      .then(d => setRelated((d.data ?? []).filter((b: RelatedBlog) => b._id !== blog._id).slice(0, 3)));
+      .then(d => {
+        const filtered = (d.data ?? []).filter((b: RelatedBlog) => b.slug !== blog.slug);
+        setRelated(filtered.slice(0, 4));
+      })
+      .catch(() => {});
   }, [blog]);
 
   const handleLike = async () => {
@@ -407,16 +471,15 @@ export default function BlogDetailPage() {
     setTimeout(() => setCopied(false), 2000);
   };
 
-  // ─── Loading ──
-
+  // ── Loading ──
   if (loading) {
     return (
       <div className="min-h-screen" style={{ background: 'var(--bg)' }}>
-        <div className="max-w-4xl mx-auto px-6 py-16 animate-pulse">
+        <div className="max-w-6xl mx-auto px-6 py-16 animate-pulse">
           <div className="h-8 w-3/4 bg-[#ede9e1] rounded mb-4" />
           <div className="h-4 w-1/3 bg-[#ede9e1] rounded mb-8" />
           <div className="h-80 w-full bg-[#ede9e1] rounded-2xl mb-8" />
-          {[1,2,3,4].map(i => <div key={i} className="h-4 w-full bg-[#ede9e1] rounded mb-3" />)}
+          {[1, 2, 3, 4].map(i => <div key={i} className="h-4 w-full bg-[#ede9e1] rounded mb-3" />)}
         </div>
       </div>
     );
@@ -437,6 +500,7 @@ export default function BlogDetailPage() {
   const headings = extractHeadings(blog.content);
   const processedContent = injectHeadingIds(blog.content);
   const readMins = calcReadingTime(blog.content);
+  const hasSidebar = headings.length > 0 || related.length > 0;
 
   return (
     <div className="min-h-screen" style={{ background: 'var(--bg)' }}>
@@ -448,24 +512,26 @@ export default function BlogDetailPage() {
           <div className="relative h-[420px] md:h-[520px] overflow-hidden">
             <Image src={blog.featuredImage} alt={blog.title} fill className="object-cover" priority sizes="100vw" />
             <div className="absolute inset-0 bg-gradient-to-t from-[#0f0e0c]/80 via-[#0f0e0c]/30 to-transparent" />
-            <div className="absolute bottom-0 left-0 right-0 p-8 md:p-14 max-w-4xl mx-auto">
-              <Link href="/blogs" className="inline-flex items-center gap-1.5 text-[0.65rem] text-[#c9a84c] tracking-widest uppercase font-semibold mb-4 hover:text-white transition-colors">
-                <ArrowLeft size={11} /> Blog
-              </Link>
-              <span className="block text-[0.6rem] tracking-[0.25em] uppercase text-[#c9a84c] font-semibold mb-3">{blog.category}</span>
-              <h1 className="font-['Cormorant_Garamond',serif] text-[2.2rem] md:text-[3rem] font-semibold text-white leading-tight max-w-3xl">
-                {blog.title}
-              </h1>
+            <div className="absolute bottom-0 left-0 right-0 p-8 md:p-14">
+              <div className="max-w-6xl mx-auto">
+                <Link href="/blogs" className="inline-flex items-center gap-1.5 text-[0.65rem] text-[#c9a84c] tracking-widest uppercase font-semibold mb-4 hover:text-white transition-colors">
+                  <ArrowLeft size={11} /> Blog
+                </Link>
+                <span className="block text-[0.6rem] tracking-[0.25em] uppercase text-[#c9a84c] font-semibold mb-3">{blog.category}</span>
+                <h1 className="font-['Cormorant_Garamond',serif] text-[2.2rem] md:text-[3rem] font-semibold text-white leading-tight max-w-3xl">
+                  {blog.title}
+                </h1>
+              </div>
             </div>
           </div>
         ) : (
           <div className="bg-[#0f0e0c] py-20 px-6">
-            <div className="max-w-4xl mx-auto">
+            <div className="max-w-6xl mx-auto">
               <Link href="/blogs" className="inline-flex items-center gap-1.5 text-[0.65rem] text-[#c9a84c] tracking-widest uppercase font-semibold mb-4 hover:text-[#e8d08a] transition-colors">
                 <ArrowLeft size={11} /> Blog
               </Link>
               <span className="block text-[0.6rem] tracking-[0.25em] uppercase text-[#c9a84c] font-semibold mb-3">{blog.category}</span>
-              <h1 className="font-['Cormorant_Garamond',serif] text-[2.5rem] md:text-[3.5rem] font-semibold text-white leading-tight">
+              <h1 className="font-['Cormorant_Garamond',serif] text-[2.5rem] md:text-[3.5rem] font-semibold text-white leading-tight max-w-3xl">
                 {blog.title}
               </h1>
             </div>
@@ -474,7 +540,7 @@ export default function BlogDetailPage() {
       </section>
 
       {/* ── Article meta bar ── */}
-      <div className="bg-white border-b border-[#ede9e1]">
+      <div className="bg-white border-b border-[#ede9e1] sticky top-0 z-40">
         <div className="max-w-6xl mx-auto px-6 py-3 flex flex-wrap items-center gap-4 text-[0.68rem] text-[#a09a90]">
           <span className="font-semibold text-[#5c5852]">By {blog.authorName}</span>
           {blog.publishedAt && (
@@ -489,7 +555,6 @@ export default function BlogDetailPage() {
             <Eye size={11} strokeWidth={1.8} />{blog.views.toLocaleString()} views
           </span>
           <div className="ml-auto flex items-center gap-2">
-            {/* Like */}
             <button
               onClick={handleLike}
               className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full border transition-all text-[0.68rem] font-semibold ${
@@ -501,7 +566,6 @@ export default function BlogDetailPage() {
               <Heart size={12} strokeWidth={2} className={liked ? 'fill-rose-500' : ''} />
               {likesCount}
             </button>
-            {/* Copy link */}
             <button
               onClick={handleCopyLink}
               className="flex items-center gap-1.5 px-3 py-1.5 rounded-full border border-[#ede9e1] text-[#a09a90] hover:border-[#c9a84c]/40 hover:text-[#8a6e2a] transition-all text-[0.68rem]"
@@ -509,7 +573,6 @@ export default function BlogDetailPage() {
               {copied ? <Check size={12} strokeWidth={2.5} className="text-green-500" /> : <Link2 size={12} strokeWidth={2} />}
               {copied ? 'Copied!' : 'Copy link'}
             </button>
-            {/* Share */}
             {typeof navigator !== 'undefined' && 'share' in navigator && (
               <button
                 onClick={() => navigator.share({ title: blog.title, url: window.location.href })}
@@ -524,16 +587,16 @@ export default function BlogDetailPage() {
 
       {/* ── Main content layout ── */}
       <div className="max-w-6xl mx-auto px-6 py-12">
-        <div className="grid grid-cols-1 lg:grid-cols-[1fr_260px] gap-10">
+        <div className={`grid gap-10 ${hasSidebar ? 'grid-cols-1 lg:grid-cols-[1fr_272px]' : 'grid-cols-1 max-w-3xl'}`}>
 
           {/* ── Article content ── */}
           <div>
-            {/* Lead */}
-            <p className="text-[1rem] text-[#5c5852] leading-relaxed mb-8 border-l-4 border-[#c9a84c] pl-5 italic font-['Cormorant_Garamond',serif] text-[1.1rem]">
+            {/* Lead / excerpt */}
+            <p className="text-[1.05rem] text-[#5c5852] leading-relaxed mb-8 border-l-4 border-[#c9a84c] pl-5 italic font-['Cormorant_Garamond',serif]">
               {blog.shortDescription}
             </p>
 
-            {/* Content */}
+            {/* Body */}
             <div
               ref={contentRef}
               className="prose-blog"
@@ -551,14 +614,13 @@ export default function BlogDetailPage() {
               </div>
             )}
 
-            {/* ── Comments section ── */}
+            {/* ── Comments ── */}
             <div className="mt-12 pt-8 border-t border-[#ede9e1]">
               <h2 className="font-['Cormorant_Garamond',serif] text-[1.6rem] text-[#1a1714] mb-6 flex items-center gap-3">
                 <MessageCircle size={20} strokeWidth={1.4} className="text-[#c9a84c]" />
                 {blog.comments.length} Comment{blog.comments.length !== 1 ? 's' : ''}
               </h2>
 
-              {/* Comment input */}
               {token ? (
                 <div className="mb-6 flex gap-3">
                   <div className="w-8 h-8 rounded-full bg-[#c9a84c]/15 border border-[#c9a84c]/20 flex items-center justify-center shrink-0 text-[0.7rem] font-bold text-[#c9a84c]">
@@ -591,7 +653,6 @@ export default function BlogDetailPage() {
                 </div>
               )}
 
-              {/* Comment list */}
               {blog.comments.length === 0 ? (
                 <div className="py-8 text-center text-[0.78rem] text-[#b0a898]">
                   No comments yet. Be the first to share your thoughts!
@@ -613,53 +674,20 @@ export default function BlogDetailPage() {
             </div>
           </div>
 
-          {/* ── Sidebar ── */}
-          <aside className="hidden lg:block">
-            <TableOfContents headings={headings} />
-          </aside>
+          {/* ── Sticky Sidebar ── */}
+          {hasSidebar && (
+            <aside className="hidden lg:block">
+              <div className="sticky top-[60px] space-y-5">
+                {/* Table of Contents */}
+                <TableOfContents headings={headings} />
+
+                {/* Related Articles */}
+                <RelatedArticlesSidebar related={related} currentSlug={slug} />
+              </div>
+            </aside>
+          )}
         </div>
       </div>
-
-      {/* ── Related Articles ── */}
-      {related.length > 0 && (
-        <section className="border-t border-[#ede9e1] py-12 bg-[#faf9f7]">
-          <div className="max-w-6xl mx-auto px-6">
-            <div className="flex items-end justify-between mb-8">
-              <div>
-                <p className="text-[0.62rem] tracking-[0.25em] uppercase text-[#c9a84c] font-semibold mb-1">◆ Keep Reading</p>
-                <h2 className="font-['Cormorant_Garamond',serif] text-[1.8rem] text-[#1a1714]">Related Articles</h2>
-              </div>
-              <Link href="/blogs" className="text-[0.72rem] text-[#c9a84c] hover:underline flex items-center gap-1 font-semibold">
-                View all <ChevronRight size={13} />
-              </Link>
-            </div>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
-              {related.map(b => (
-                <Link key={b._id} href={`/blogs/${b.slug}`} className="group block">
-                  <article className="bg-white border border-[#ede9e1] rounded-xl overflow-hidden hover:-translate-y-0.5 hover:shadow-[0_12px_32px_rgba(0,0,0,0.08)] transition-all duration-300">
-                    <div className="relative h-40 bg-[#f5f3ef]">
-                      {b.featuredImage ? (
-                        <Image src={b.featuredImage} alt={b.title} fill className="object-cover group-hover:scale-105 transition-transform duration-500" sizes="33vw" />
-                      ) : (
-                        <div className="w-full h-full flex items-center justify-center">
-                          <BookOpen size={24} className="text-[#d4cfc8]" />
-                        </div>
-                      )}
-                    </div>
-                    <div className="p-4">
-                      <span className="text-[0.58rem] tracking-widest uppercase text-[#c9a84c] font-semibold">{b.category}</span>
-                      <h3 className="font-['Cormorant_Garamond',serif] text-[1.05rem] font-semibold text-[#1a1714] mt-1 line-clamp-2 group-hover:text-[#8a6e2a] transition-colors">
-                        {b.title}
-                      </h3>
-                      <p className="text-[0.7rem] text-[#a09a90] mt-1 line-clamp-2">{b.shortDescription}</p>
-                    </div>
-                  </article>
-                </Link>
-              ))}
-            </div>
-          </div>
-        </section>
-      )}
 
       {/* ── Blog content styles ── */}
       <style jsx global>{`
@@ -714,6 +742,7 @@ export default function BlogDetailPage() {
           border-radius: 4px;
           font-size: 0.85em;
           font-family: monospace;
+          color: #c9a84c;
         }
         .prose-blog pre {
           background: #1a1714;
@@ -730,6 +759,26 @@ export default function BlogDetailPage() {
           background: linear-gradient(90deg, transparent, #c9a84c40, transparent);
           margin: 2rem 0;
         }
+        .prose-blog table {
+          width: 100%;
+          border-collapse: collapse;
+          margin: 1.5rem 0;
+          font-size: 0.85rem;
+        }
+        .prose-blog table th {
+          background: #f5f3ef;
+          padding: 0.5rem 0.75rem;
+          border: 1px solid #ede9e1;
+          font-weight: 600;
+          color: #1a1714;
+          text-align: left;
+        }
+        .prose-blog table td {
+          padding: 0.5rem 0.75rem;
+          border: 1px solid #ede9e1;
+          color: #5c5852;
+        }
+        .prose-blog table tr:nth-child(even) td { background: #faf9f7; }
       `}</style>
     </div>
   );
