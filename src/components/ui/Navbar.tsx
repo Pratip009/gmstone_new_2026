@@ -356,6 +356,7 @@ export default function Navbar({ initialCategories = [] }: { initialCategories?:
             <div style={{ display: "flex", alignItems: "center", gap: "2px" }}>
               <Link href="/" className="nav-toplink">Home</Link>
               <Link href="/about" className="nav-toplink">About</Link>
+              <Link href="/blogs" className="nav-toplink">Blog</Link>
               <Link href="/contact" className="nav-toplink">Contact Us</Link>
 
               {user ? (
@@ -749,6 +750,12 @@ export default function Navbar({ initialCategories = [] }: { initialCategories?:
                 textDecoration: "none", fontFamily: "'Poppins', sans-serif",
                 borderBottom: "1px solid #f0eeff",
               }}>Orders</Link>
+              <Link href="/blogs" onClick={() => setMenuOpen(false)} style={{
+                display: "flex", alignItems: "center", padding: "15px 0",
+                fontSize: "15px", fontWeight: 500, color: "#1a1a2e",
+                textDecoration: "none", fontFamily: "'Poppins', sans-serif",
+                borderBottom: "1px solid #f0eeff",
+              }}>Blog</Link>
               {isAdmin && (
                 <Link href="/admin" onClick={() => setMenuOpen(false)} style={{
                   display: "flex", alignItems: "center", padding: "15px 0",

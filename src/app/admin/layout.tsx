@@ -10,17 +10,19 @@ import {
   ExternalLink,
   ChevronRight,
   HomeIcon,
-  Users
+  Users,
+  BookOpen,
 } from 'lucide-react';
 
 const NAV = [
-  { href: '/',            label: 'Home',   icon: HomeIcon, exact: true },
+  { href: '/',                 label: 'Home',        icon: HomeIcon,       exact: true },
   { href: '/admin',            label: 'Dashboard',   icon: LayoutDashboard, exact: true },
   { href: '/admin/products',   label: 'Products',    icon: Gem },
   { href: '/admin/upload',     label: 'Bulk Upload', icon: UploadCloud },
   { href: '/admin/categories', label: 'Categories',  icon: Layers },
   { href: '/admin/orders',     label: 'Orders',      icon: ShoppingBag },
   { href: '/admin/contacts',   label: 'Contacts',    icon: Users },
+  { href: '/admin/blogs',      label: 'Blog',        icon: BookOpen },
 ];
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
