@@ -4,6 +4,7 @@ import Providers from "./providers";
 import StartupLoader from "./StartupLoader";
 import "./global.css";
 import FloatingSocialIcons from "@/components/ui/FloatingSocialIcons";
+import GemConsultant from "@/components/GemConsultant/GemConsultant";
 
 const BASE_URL = "https://gmstone-new-2026.vercel.app";
 
@@ -118,7 +119,9 @@ export default function RootLayout({
             {children}
             <FloatingSocialIcons />
           </StartupLoader>
+          <GemConsultant />
         </Providers>
+        
       </body>
     </html>
   );
