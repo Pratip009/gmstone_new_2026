@@ -103,7 +103,6 @@ export async function POST(req: NextRequest) {
     });
   }
 
-  // Validate OpenAI key is present before streaming
   if (!process.env.OPENAI_API_KEY) {
     return new Response(JSON.stringify({ error: "OPENAI_API_KEY is not configured" }), {
       status: 500,
@@ -136,22 +135,14 @@ export async function POST(req: NextRequest) {
           });
         }
 
-        // Append user message
         session.messages.push({ role: "user", content: message, timestamp: new Date() });
 
-        /* ── Keep message history from growing unbounded ── */
-        // Keep system prompt + last 30 messages to avoid token overflow
         const MAX_HISTORY = 30;
         const recentMessages = session.messages.slice(-MAX_HISTORY);
 
-        /* ── Build system prompt with memory ── */
         const memoryStr = JSON.stringify(session.memory, null, 2);
-        const systemPrompt = VICTORIA_SYSTEM_PROMPT.replace(
-          "{MEMORY_PLACEHOLDER}",
-          memoryStr
-        );
+        const systemPrompt = VICTORIA_SYSTEM_PROMPT.replace("{MEMORY_PLACEHOLDER}", memoryStr);
 
-        /* ── Build OpenAI messages from session history ── */
         const openAIMessages: OpenAIMessage[] = [
           { role: "system", content: systemPrompt },
           ...recentMessages.map((m) => ({
@@ -162,16 +153,21 @@ export async function POST(req: NextRequest) {
 
         enqueue({ type: "thinking" });
 
-        /* ── Agentic loop (max 5 iterations) ── */
+        /* ── Agentic loop ── */
         let iteration = 0;
         let finalText = "";
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         let collectedProducts: any[] = [];
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        let collectedCategories: any[] = [];
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        let collectedSubcategories: any[] = [];
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         let comparisonData: any = null;
 
         while (iteration < 5) {
           iteration++;
+          console.log(`\n[GemAI] ── Iteration ${iteration} ──`);
 
           let openAIRes: Response;
           try {
@@ -218,7 +214,6 @@ export async function POST(req: NextRequest) {
             return;
           }
 
-          // Handle API-level errors returned in the body
           if (openAIData.error) {
             console.error("[OpenAI API Error]", openAIData.error);
             enqueue({ type: "error", message: `OpenAI error: ${openAIData.error.message}` });
@@ -236,7 +231,10 @@ export async function POST(req: NextRequest) {
           const choice = openAIData.choices[0];
           const assistantMsg = choice.message;
 
-          // Add assistant message to context
+          console.log(`[GemAI] finish_reason: ${choice.finish_reason}`);
+          console.log(`[GemAI] tool_calls: ${assistantMsg.tool_calls?.length ?? 0}`);
+          console.log(`[GemAI] content snippet: ${assistantMsg.content?.slice(0, 120) ?? "(none)"}`);
+
           openAIMessages.push({
             role: "assistant",
             content: assistantMsg.content,
@@ -246,6 +244,7 @@ export async function POST(req: NextRequest) {
           /* ── No tool calls → final answer ── */
           if (!assistantMsg.tool_calls || assistantMsg.tool_calls.length === 0) {
             finalText = assistantMsg.content ?? "";
+            console.log("[GemAI] No tool calls — using final text.");
             break;
           }
 
@@ -261,6 +260,7 @@ export async function POST(req: NextRequest) {
               toolArgs = {};
             }
 
+            console.log(`[GemAI] → Tool called: "${toolName}"`, toolArgs);
             enqueue({ type: "tool_call", tool: toolName, args: toolArgs });
 
             let toolResult: unknown;
@@ -271,17 +271,49 @@ export async function POST(req: NextRequest) {
               toolResult = { error: `Tool ${toolName} failed.` };
             }
 
-            // Collect product data for the frontend
+            console.log(
+              `[GemAI] ← Tool result for "${toolName}":`,
+              JSON.stringify(toolResult)?.slice(0, 300)
+            );
+
+            /* ── Collect frontend data by tool name ── */
             if (
               toolName === "search_products" ||
               toolName === "recommend_products" ||
               toolName === "find_similar"
             ) {
-              collectedProducts = toolResult as typeof collectedProducts;
+              collectedProducts = Array.isArray(toolResult) ? toolResult : [];
+              console.log(`[GemAI] collectedProducts count: ${collectedProducts.length}`);
+
             } else if (toolName === "get_product" && toolResult) {
               collectedProducts = [toolResult];
+              console.log(`[GemAI] collectedProducts (single): 1`);
+
             } else if (toolName === "compare_products" && toolResult) {
               comparisonData = toolResult;
+              console.log(`[GemAI] comparisonData set`);
+
+            } else if (toolName === "get_categories") {
+              collectedCategories = Array.isArray(toolResult) ? toolResult : [];
+              console.log(`[GemAI] collectedCategories count: ${collectedCategories.length}`);
+              if (collectedCategories.length > 0) {
+                console.log(`[GemAI] First category sample:`, JSON.stringify(collectedCategories[0]));
+              }
+
+            } else if (toolName === "get_subcategories") {
+              collectedSubcategories = Array.isArray(toolResult) ? toolResult : [];
+              // Attach parentName from args if available so the UI can show breadcrumb
+              const parentId = toolArgs?.parentId as string | undefined;
+              if (parentId && collectedSubcategories.length > 0) {
+                collectedSubcategories = collectedSubcategories.map((sub) => ({
+                  ...sub,
+                  parentId,
+                }));
+              }
+              console.log(`[GemAI] collectedSubcategories count: ${collectedSubcategories.length}`);
+              if (collectedSubcategories.length > 0) {
+                console.log(`[GemAI] First subcategory sample:`, JSON.stringify(collectedSubcategories[0]));
+              }
             }
 
             openAIMessages.push({
@@ -292,11 +324,9 @@ export async function POST(req: NextRequest) {
             });
           }
 
-          // If finish_reason is "stop" despite having tool_calls (guard)
           if (choice.finish_reason === "stop") break;
         }
 
-        // If we ran out of iterations without a final text, use last assistant content
         if (!finalText) {
           const lastAssistant = [...openAIMessages]
             .reverse()
@@ -311,7 +341,7 @@ export async function POST(req: NextRequest) {
           timestamp: new Date(),
         });
 
-        /* ── Update session memory from user message ── */
+        /* ── Update memory ── */
         const memoryUpdates = extractMemoryUpdates(message);
         if (memoryUpdates.budget) {
           session.memory.budget = { ...session.memory.budget, ...memoryUpdates.budget };
@@ -321,7 +351,6 @@ export async function POST(req: NextRequest) {
         if (memoryUpdates.certification) session.memory.certification = memoryUpdates.certification;
         if (memoryUpdates.purpose) session.memory.purpose = memoryUpdates.purpose;
 
-        // Track viewed products
         if (collectedProducts.length > 0) {
           const newIds = collectedProducts
             .map((p) => p?._id?.toString?.() ?? "")
@@ -334,14 +363,28 @@ export async function POST(req: NextRequest) {
         session.markModified("memory");
         await session.save();
 
-        /* ── Stream final response ── */
-        enqueue({
+        /* ── Build and stream final SSE response ── */
+        const responsePayload: Record<string, unknown> = {
           type: "response",
           message: finalText,
-          products: collectedProducts.length > 0 ? collectedProducts : undefined,
-          comparison: comparisonData ?? undefined,
           sessionId,
-        });
+        };
+
+        if (collectedProducts.length > 0)      responsePayload.products      = collectedProducts;
+        if (collectedCategories.length > 0)    responsePayload.categories    = collectedCategories;
+        if (collectedSubcategories.length > 0) responsePayload.subcategories = collectedSubcategories;
+        if (comparisonData)                    responsePayload.comparison    = comparisonData;
+
+        console.log("[GemAI] Final SSE payload keys:", Object.keys(responsePayload));
+        console.log(
+          "[GemAI] Counts — products:", collectedProducts.length,
+          "| categories:", collectedCategories.length,
+          "| subcategories:", collectedSubcategories.length,
+          "| comparison:", !!comparisonData
+        );
+
+        enqueue(responsePayload);
+
       } catch (err) {
         console.error("[GemAI Chat Error]", err);
         enqueue({

@@ -4,111 +4,138 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 
+
+
 /* ─────────────────────────────────────────────────────────────
-   Slides — Unsplash jewelry images + premium content
+   Slides — local images + original content
 ────────────────────────────────────────────────────────────── */
 const BANNERS = [
   {
     id: 1,
-    img: "https://images.unsplash.com/photo-1599643478518-a784e5dc4c8f?w=1800&h=900&fit=crop&crop=center&q=85",
+    img: "/images/i1.png",
     eyebrow: "Exclusive Offer",
     line1: "Alpha Color",
     line2: "Diamonds",
     tag: "½ Off",
     cta: "Shop Now",
     href: "/collections/color-diamonds",
-    accent: "#c9a84c",
+    accent: "#b8c9d4",
+    accentGlow: "#5a8fa8",
   },
   {
     id: 2,
-    img: "https://images.unsplash.com/photo-1605100804763-247f67b3557e?w=1800&h=900&fit=crop&crop=center&q=85",
+    img: "/images/i2.png",
     eyebrow: "Curated Luxury",
     line1: "Alpha Collection",
     line2: "Jewels",
     tag: "½ Off",
     cta: "Explore",
     href: "/collections/jewels",
-    accent: "#c9a84c",
+    accent: "#b8c9d4",
+    accentGlow: "#5a8fa8",
   },
   {
     id: 3,
-    img: "https://images.unsplash.com/photo-1551717743-49959800b1f6?w=1800&h=900&fit=crop&crop=center&q=85",
+    img: "/images/i3.png",
     eyebrow: "Find Your Stone",
     line1: "Shop",
     line2: "Birthstones",
     tag: "½ Off",
     cta: "Find Yours",
     href: "/collections/birthstones",
-    accent: "#a87cc9",
+    accent: "#c9b8d4",
+    accentGlow: "#8a5aa8",
   },
   {
     id: 4,
-    img: "https://images.unsplash.com/photo-1589674781759-c21c37956a44?w=1800&h=900&fit=crop&crop=center&q=85",
+    img: "/images/i4.png",
     eyebrow: "Price Promise",
     line1: "Alpha White",
     line2: "Diamonds",
     tag: "Best Price",
     cta: "View Diamonds",
     href: "/collections/white-diamonds",
-    accent: "#e0e0e0",
+    accent: "#d4d4d4",
+    accentGlow: "#9ab0bc",
   },
   {
     id: 5,
-    img: "https://images.unsplash.com/photo-1515562141207-7a88fb7ce338?w=1800&h=900&fit=crop&crop=center&q=85",
+    img: "/images/i5.png",
     eyebrow: "At Alpha",
     line1: "Finest Precious",
     line2: "Jewels",
     tag: "½ Off",
     cta: "Shop Jewels",
     href: "/collections/precious-jewels",
-    accent: "#c9a84c",
+    accent: "#b8c9d4",
+    accentGlow: "#5a8fa8",
   },
   {
     id: 6,
-    img: "https://images.unsplash.com/photo-1567225477277-c8162eb9e02b?w=1800&h=900&fit=crop&crop=center&q=85",
+    img: "/images/i6.png",
     eyebrow: "Ethically Sourced",
     line1: "Natural Jewels",
     line2: "From the World",
     tag: "New In",
     cta: "Discover",
     href: "/collections/natural-jewels",
-    accent: "#84c9a8",
+    accent: "#b8d4c0",
+    accentGlow: "#5aa87a",
   },
   {
     id: 7,
-    img: "https://images.unsplash.com/photo-1573408301185-9519f94ae53e?w=1800&h=900&fit=crop&crop=center&q=85",
+    img: "/images/i7.png",
     eyebrow: "Trade Preferred",
     line1: "Jewelers'",
     line2: "Top Choice",
     tag: "#1 Pick",
     cta: "Shop Trade",
     href: "/collections/trade",
-    accent: "#c9a84c",
+    accent: "#b8c9d4",
+    accentGlow: "#5a8fa8",
   },
 ] as const;
 
 const AUTO_ROTATE_MS = 6000;
 
-function Sparkle({ accent, size = 14 }: { accent: string; size?: number }) {
+// ── Diamond-shaped sparkle (cinematic) ──────────────────────────────────────
+function DiamondIcon({ accent, size = 10 }: { accent: string; size?: number }) {
   return (
-    <svg width={size} height={size} viewBox="0 0 20 20" fill="none" aria-hidden="true">
-      <path
-        d="M10 2L11.5 8.5L18 10L11.5 11.5L10 18L8.5 11.5L2 10L8.5 8.5L10 2Z"
+    <svg width={size} height={size} viewBox="0 0 12 12" fill="none" aria-hidden="true">
+      <rect
+        x="6" y="0.5"
+        width="7.5" height="7.5"
+        transform="rotate(45 6 6)"
         fill={accent}
-        fillOpacity="0.9"
+        fillOpacity="0.85"
       />
     </svg>
+  );
+}
+
+// ── Scanline texture overlay ─────────────────────────────────────────────────
+function Scanlines() {
+  return (
+    <div
+      className="absolute inset-0 pointer-events-none z-10"
+      style={{
+        backgroundImage:
+          "repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(0,0,0,0.06) 2px, rgba(0,0,0,0.06) 4px)",
+        mixBlendMode: "multiply",
+      }}
+    />
   );
 }
 
 const EASE = [0.16, 1, 0.3, 1] as [number, number, number, number];
 
 const stagger = (i: number) => ({
-  hidden: { opacity: 0, y: 20 },
+  hidden: { opacity: 0, x: -18, filter: "blur(4px)" },
   visible: {
     opacity: 1,
-    y: 0,
-    transition: { delay: 0.1 + i * 0.1, duration: 0.6, ease: EASE },
+    x: 0,
+    filter: "blur(0px)",
+    transition: { delay: 0.08 + i * 0.12, duration: 0.7, ease: EASE },
   },
 });
 
@@ -122,13 +149,8 @@ export default function HeroCarousel() {
     setCurrent((index + BANNERS.length) % BANNERS.length);
   }, []);
 
-  const next = useCallback(() => {
-    setCurrent((c) => (c + 1) % BANNERS.length);
-  }, []);
-
-  const prev = useCallback(() => {
-    setCurrent((c) => (c - 1 + BANNERS.length) % BANNERS.length);
-  }, []);
+  const next = useCallback(() => setCurrent((c) => (c + 1) % BANNERS.length), []);
+  const prev = useCallback(() => setCurrent((c) => (c - 1 + BANNERS.length) % BANNERS.length), []);
 
   useEffect(() => {
     if (isPaused) return;
@@ -152,9 +174,7 @@ export default function HeroCarousel() {
   const handleTouchEnd = (e: React.TouchEvent) => {
     const dx = e.changedTouches[0].clientX - touchStartX.current;
     const dy = e.changedTouches[0].clientY - touchStartY.current;
-    if (Math.abs(dx) > Math.abs(dy) && Math.abs(dx) > 44) {
-      dx < 0 ? next() : prev();
-    }
+    if (Math.abs(dx) > Math.abs(dy) && Math.abs(dx) > 44) dx < 0 ? next() : prev();
   };
 
   const b = BANNERS[current];
@@ -162,15 +182,16 @@ export default function HeroCarousel() {
   return (
     <>
       <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;1,300;1,400&family=Tenor+Sans&display=swap');
-        .hero-display { font-family: 'Cormorant Garamond', Georgia, serif; }
-        .hero-label   { font-family: 'Tenor Sans', sans-serif; }
+        @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,300;0,400;1,300;1,400&family=Barlow+Condensed:wght@200;300;400&display=swap');
+        .hero-display { font-family: 'Playfair Display', Georgia, serif; }
+        .hero-label   { font-family: 'Barlow Condensed', sans-serif; font-weight: 300; }
         :root { --carousel-h: 42svh; }
         @media (min-width: 640px) { :root { --carousel-h: 70vh; } }
       `}</style>
 
       <section
         className="relative w-full select-none"
+        style={{ background: "#04080c" }}
         aria-label="Promotional banners"
         aria-roledescription="carousel"
       >
@@ -186,10 +207,10 @@ export default function HeroCarousel() {
           <AnimatePresence mode="sync">
             <motion.div
               key={current}
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              transition={{ duration: 1.0, ease: "easeInOut" }}
+              initial={{ opacity: 0, scale: 1.04 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.98 }}
+              transition={{ duration: 1.2, ease: "easeInOut" }}
               className="absolute inset-0 w-full h-full"
               aria-roledescription="slide"
               aria-label={`Slide ${current + 1} of ${BANNERS.length}`}
@@ -212,52 +233,47 @@ export default function HeroCarousel() {
                 draggable={false}
               />
 
-              {/* Gradient overlays — lighter so image shows through */}
-              <div
-                className="absolute inset-0 pointer-events-none"
-                style={{
-                  background:
-                    "linear-gradient(to top, rgba(0,0,0,0.70) 0%, rgba(0,0,0,0.30) 40%, rgba(0,0,0,0.05) 70%, transparent 100%)",
-                }}
-              />
-              <div
-                className="absolute inset-0 pointer-events-none"
-                style={{
-                  background:
-                    "linear-gradient(to right, rgba(0,0,0,0.45) 0%, rgba(0,0,0,0.15) 40%, transparent 70%)",
-                }}
-              />
+
 
               {/* ── Text block ── */}
-              <div className="absolute inset-0 flex items-center">
+              <div className="absolute inset-0 flex items-center z-20">
                 <div
                   className="flex flex-col"
                   style={{
-                    paddingLeft: "clamp(20px, 6vw, 120px)",
+                    paddingLeft: "clamp(24px, 7vw, 140px)",
                     paddingRight: "clamp(20px, 4vw, 60px)",
-                    maxWidth: "clamp(240px, 65vw, 620px)",
+                    maxWidth: "clamp(260px, 60vw, 600px)",
                   }}
                 >
-                  {/* Eyebrow */}
+                  {/* Eyebrow — wide-tracked label */}
                   <motion.div
                     key={`${current}-eyebrow`}
                     variants={stagger(0)}
                     initial="hidden"
                     animate="visible"
-                    className="flex items-center gap-2 mb-3 sm:mb-5"
+                    className="flex items-center gap-3 mb-3 sm:mb-5"
                   >
-                    <Sparkle accent={b.accent} size={10} />
+                    <DiamondIcon accent={b.accent} size={7} />
                     <span
-                      className="hero-label uppercase"
+                      className="hero-label"
                       style={{
-                        fontSize: "clamp(8px, 1vw, 11px)",
-                        letterSpacing: "0.3em",
+                        fontSize: "clamp(8px, 0.9vw, 10px)",
+                        letterSpacing: "0.38em",
+                        textTransform: "uppercase",
                         color: b.accent,
+                        opacity: 0.9,
                       }}
                     >
                       {b.eyebrow}
                     </span>
-                    <Sparkle accent={b.accent} size={10} />
+                    <div
+                      style={{
+                        flex: 1,
+                        height: 1,
+                        maxWidth: 48,
+                        background: `linear-gradient(to right, ${b.accent}66, transparent)`,
+                      }}
+                    />
                   </motion.div>
 
                   {/* Headline line 1 */}
@@ -266,11 +282,13 @@ export default function HeroCarousel() {
                     variants={stagger(1)}
                     initial="hidden"
                     animate="visible"
-                    className="hero-display font-light text-white"
+                    className="hero-display text-white"
                     style={{
-                      fontSize: "clamp(26px, 5.5vw, 88px)",
-                      lineHeight: 0.92,
-                      textShadow: "0 4px 40px rgba(0,0,0,0.25)",
+                      fontSize: "clamp(28px, 5.8vw, 92px)",
+                      fontWeight: 300,
+                      lineHeight: 0.9,
+                      letterSpacing: "-0.01em",
+                      textShadow: `0 0 80px ${b.accentGlow}40, 0 4px 40px rgba(0,0,0,0.6)`,
                       margin: 0,
                     }}
                   >
@@ -283,29 +301,32 @@ export default function HeroCarousel() {
                     variants={stagger(2)}
                     initial="hidden"
                     animate="visible"
-                    className="hero-display font-light text-white"
+                    className="hero-display text-white"
                     style={{
-                      fontSize: "clamp(26px, 5.5vw, 88px)",
-                      lineHeight: 0.92,
+                      fontSize: "clamp(28px, 5.8vw, 92px)",
+                      fontWeight: 300,
                       fontStyle: "italic",
-                      textShadow: "0 4px 40px rgba(0,0,0,0.25)",
-                      marginBottom: "clamp(10px, 2vh, 28px)",
+                      lineHeight: 0.9,
+                      letterSpacing: "-0.01em",
+                      textShadow: `0 0 80px ${b.accentGlow}40, 0 4px 40px rgba(0,0,0,0.6)`,
+                      color: b.accent,
+                      marginBottom: "clamp(12px, 2.5vh, 32px)",
                     }}
                   >
                     {b.line2}
                   </motion.h2>
 
-                  {/* Gold rule */}
+                  {/* Divider — thin ruled line */}
                   <motion.div
                     key={`${current}-rule`}
                     variants={stagger(3)}
                     initial="hidden"
                     animate="visible"
                     style={{
-                      width: 40,
+                      width: 56,
                       height: 1,
-                      background: `linear-gradient(to right, ${b.accent}, transparent)`,
-                      marginBottom: "clamp(10px, 2vh, 24px)",
+                      background: `linear-gradient(to right, ${b.accent}cc, transparent)`,
+                      marginBottom: "clamp(12px, 2.5vh, 28px)",
                     }}
                   />
 
@@ -315,53 +336,49 @@ export default function HeroCarousel() {
                     variants={stagger(4)}
                     initial="hidden"
                     animate="visible"
-                    className="flex items-center gap-4 flex-wrap"
+                    className="flex items-center gap-5 flex-wrap"
                   >
-                    {/* Badge */}
+                    {/* Badge — outlined cinematic style */}
                     <span
                       className="hero-label"
                       style={{
-                        fontSize: "clamp(8px, 1.1vw, 10px)",
-                        letterSpacing: "0.22em",
+                        fontSize: "clamp(8px, 0.95vw, 10px)",
+                        letterSpacing: "0.32em",
                         textTransform: "uppercase",
-                        color: "#0a0806",
-                        background: `linear-gradient(135deg, ${b.accent} 0%, #f5dfa0 100%)`,
-                        padding: "5px 12px",
+                        color: b.accent,
+                        border: `1px solid ${b.accent}66`,
+                        padding: "5px 14px",
                         display: "inline-block",
+                        background: `${b.accentGlow}10`,
                       }}
                     >
                       {b.tag}
                     </span>
 
-                    {/* CTA link */}
+                    {/* CTA */}
                     <a
                       href={b.href}
                       className="hero-label group inline-flex items-center gap-2"
                       style={{
-                        fontSize: "clamp(8px, 1.1vw, 10px)",
-                        letterSpacing: "0.26em",
+                        fontSize: "clamp(8px, 0.95vw, 10px)",
+                        letterSpacing: "0.32em",
                         textTransform: "uppercase",
-                        color: "rgba(255,255,255,0.88)",
+                        color: "rgba(255,255,255,0.7)",
                         textDecoration: "none",
-                        borderBottom: `1px solid ${b.accent}55`,
-                        paddingBottom: 4,
-                        transition: "border-color 0.3s, color 0.3s",
+                        transition: "color 0.3s",
                       }}
                       onMouseEnter={(e) => {
-                        const el = e.currentTarget as HTMLAnchorElement;
-                        el.style.borderColor = b.accent;
-                        el.style.color = b.accent;
+                        (e.currentTarget as HTMLAnchorElement).style.color = b.accent;
                       }}
                       onMouseLeave={(e) => {
-                        const el = e.currentTarget as HTMLAnchorElement;
-                        el.style.borderColor = `${b.accent}55`;
-                        el.style.color = "rgba(255,255,255,0.88)";
+                        (e.currentTarget as HTMLAnchorElement).style.color =
+                          "rgba(255,255,255,0.7)";
                       }}
                     >
                       {b.cta}
                       <ChevronRight
                         size={10}
-                        strokeWidth={2}
+                        strokeWidth={1.5}
                         className="transition-transform duration-300 group-hover:translate-x-1"
                       />
                     </a>
@@ -373,96 +390,73 @@ export default function HeroCarousel() {
 
           {/* ── Slide counter top-right ── */}
           <div
-            className="absolute top-5 right-5 z-20 hero-label"
+            className="absolute top-5 right-5 z-30 hero-label"
             aria-live="polite"
             aria-atomic="true"
             style={{
-              fontSize: 10,
-              letterSpacing: "0.22em",
-              color: "rgba(255,255,255,0.4)",
-              textShadow: "0 1px 8px rgba(0,0,0,0.7)",
+              fontSize: 9,
+              letterSpacing: "0.28em",
+              color: "rgba(255,255,255,0.28)",
             }}
           >
-            {String(current + 1).padStart(2, "0")} · {String(BANNERS.length).padStart(2, "0")}
+            {String(current + 1).padStart(2, "0")} / {String(BANNERS.length).padStart(2, "0")}
           </div>
 
-          {/* ── Arrows — hidden on mobile (swipe), bottom-right on tablet, center on desktop ── */}
-          <button
-            onClick={prev}
-            aria-label="Previous slide"
-            className="hidden sm:flex absolute left-4 md:left-6 top-1/2 -translate-y-1/2 z-20 items-center justify-center transition-all duration-200 hover:scale-105 active:scale-95 focus:outline-none"
-            style={{
-              width: "clamp(36px, 3.5vw, 50px)",
-              height: "clamp(36px, 3.5vw, 50px)",
-              background: "rgba(0,0,0,0.3)",
-              backdropFilter: "blur(12px)",
-              border: "1px solid rgba(255,255,255,0.1)",
-              color: "rgba(255,255,255,0.8)",
-              borderRadius: 0,
-              transition: "all 0.25s",
-            }}
-            onMouseEnter={(e) => {
-              const el = e.currentTarget as HTMLButtonElement;
-              el.style.background = "rgba(201,168,76,0.18)";
-              el.style.borderColor = "rgba(201,168,76,0.5)";
-              el.style.color = "#c9a84c";
-            }}
-            onMouseLeave={(e) => {
-              const el = e.currentTarget as HTMLButtonElement;
-              el.style.background = "rgba(0,0,0,0.3)";
-              el.style.borderColor = "rgba(255,255,255,0.1)";
-              el.style.color = "rgba(255,255,255,0.8)";
-            }}
-          >
-            <ChevronLeft size={16} strokeWidth={1.5} />
-          </button>
-
-          <button
-            onClick={next}
-            aria-label="Next slide"
-            className="hidden sm:flex absolute right-4 md:right-6 top-1/2 -translate-y-1/2 z-20 items-center justify-center transition-all duration-200 hover:scale-105 active:scale-95 focus:outline-none"
-            style={{
-              width: "clamp(36px, 3.5vw, 50px)",
-              height: "clamp(36px, 3.5vw, 50px)",
-              background: "rgba(0,0,0,0.3)",
-              backdropFilter: "blur(12px)",
-              border: "1px solid rgba(255,255,255,0.1)",
-              color: "rgba(255,255,255,0.8)",
-              borderRadius: 0,
-              transition: "all 0.25s",
-            }}
-            onMouseEnter={(e) => {
-              const el = e.currentTarget as HTMLButtonElement;
-              el.style.background = "rgba(201,168,76,0.18)";
-              el.style.borderColor = "rgba(201,168,76,0.5)";
-              el.style.color = "#c9a84c";
-            }}
-            onMouseLeave={(e) => {
-              const el = e.currentTarget as HTMLButtonElement;
-              el.style.background = "rgba(0,0,0,0.3)";
-              el.style.borderColor = "rgba(255,255,255,0.1)";
-              el.style.color = "rgba(255,255,255,0.8)";
-            }}
-          >
-            <ChevronRight size={16} strokeWidth={1.5} />
-          </button>
+          {/* ── Arrows ── */}
+          {(["prev", "next"] as const).map((dir) => (
+            <button
+              key={dir}
+              onClick={dir === "prev" ? prev : next}
+              aria-label={dir === "prev" ? "Previous slide" : "Next slide"}
+              className="hidden sm:flex absolute top-1/2 -translate-y-1/2 z-30 items-center justify-center focus:outline-none"
+              style={{
+                [dir === "prev" ? "left" : "right"]: "clamp(12px, 2.5vw, 32px)",
+                width: "clamp(34px, 3vw, 46px)",
+                height: "clamp(34px, 3vw, 46px)",
+                background: "rgba(4,8,12,0.55)",
+                backdropFilter: "blur(16px)",
+                border: "1px solid rgba(255,255,255,0.08)",
+                color: "rgba(255,255,255,0.5)",
+                borderRadius: 0,
+                transition: "all 0.25s",
+              }}
+              onMouseEnter={(e) => {
+                const el = e.currentTarget as HTMLButtonElement;
+                el.style.background = `${b.accentGlow}22`;
+                el.style.borderColor = `${b.accent}55`;
+                el.style.color = b.accent;
+              }}
+              onMouseLeave={(e) => {
+                const el = e.currentTarget as HTMLButtonElement;
+                el.style.background = "rgba(4,8,12,0.55)";
+                el.style.borderColor = "rgba(255,255,255,0.08)";
+                el.style.color = "rgba(255,255,255,0.5)";
+              }}
+            >
+              {dir === "prev" ? (
+                <ChevronLeft size={14} strokeWidth={1.5} />
+              ) : (
+                <ChevronRight size={14} strokeWidth={1.5} />
+              )}
+            </button>
+          ))}
 
           {/* ── Vertical tick nav — desktop right edge ── */}
-          <div className="absolute right-5 bottom-20 z-20 hidden sm:flex flex-col items-center gap-3">
+          <div className="absolute right-5 bottom-16 z-30 hidden sm:flex flex-col items-center gap-[10px]">
             {BANNERS.map((_, i) => (
               <button
                 key={i}
                 onClick={() => go(i)}
                 aria-label={`Go to slide ${i + 1}`}
                 style={{
-                  width: i === current ? 2 : 1,
-                  height: i === current ? 28 : 12,
-                  background: i === current ? b.accent : "rgba(255,255,255,0.28)",
+                  width: 1,
+                  height: i === current ? 32 : 10,
+                  background:
+                    i === current ? b.accent : "rgba(255,255,255,0.2)",
                   border: "none",
                   padding: 0,
                   cursor: "pointer",
-                  borderRadius: 0,
-                  transition: "all 0.4s ease",
+                  transition: "all 0.45s ease",
                 }}
               />
             ))}
@@ -472,7 +466,7 @@ export default function HeroCarousel() {
         {/* ── Progress bar ── */}
         <div
           className="relative w-full overflow-hidden"
-          style={{ height: 1.5, background: "rgba(255,255,255,0.05)" }}
+          style={{ height: 1, background: "rgba(255,255,255,0.04)" }}
         >
           {!isPaused && (
             <motion.div
@@ -481,17 +475,15 @@ export default function HeroCarousel() {
               animate={{ scaleX: 1 }}
               transition={{ duration: AUTO_ROTATE_MS / 1000, ease: "linear" }}
               className="absolute inset-0 origin-left"
-              style={{
-                background: `linear-gradient(to right, ${b.accent}, #f5dfa0, ${b.accent})`,
-              }}
+              style={{ background: b.accent }}
             />
           )}
         </div>
 
         {/* ── Dot nav — mobile only ── */}
         <div
-          className="flex sm:hidden items-center justify-center gap-2 py-3"
-          style={{ background: "#070503" }}
+          className="flex sm:hidden items-center justify-center gap-[10px] py-3"
+          style={{ background: "#04080c" }}
           role="tablist"
           aria-label="Slide navigation"
         >
@@ -504,14 +496,14 @@ export default function HeroCarousel() {
               onClick={() => go(i)}
               className="focus:outline-none"
               style={{
-                height: 2,
-                width: i === current ? 24 : 8,
-                background: i === current ? b.accent : "rgba(255,255,255,0.2)",
+                height: 1,
+                width: i === current ? 28 : 8,
+                background:
+                  i === current ? b.accent : "rgba(255,255,255,0.15)",
                 border: "none",
                 padding: 0,
                 cursor: "pointer",
-                borderRadius: 0,
-                transition: "all 0.4s ease",
+                transition: "all 0.45s ease",
               }}
             />
           ))}
