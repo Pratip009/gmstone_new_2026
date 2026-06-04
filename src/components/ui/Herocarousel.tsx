@@ -1,104 +1,29 @@
 "use client";
 
 import { useState, useEffect, useRef, useCallback } from "react";
-import { ChevronLeft, ChevronRight } from "lucide-react";
+import { ChevronLeft, ChevronRight, ImageOff } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 
-
-
-/* ─────────────────────────────────────────────────────────────
-   Slides — local images + original content
-────────────────────────────────────────────────────────────── */
-const BANNERS = [
-  {
-    id: 1,
-    img: "/images/i1.png",
-    eyebrow: "Exclusive Offer",
-    line1: "Alpha Color",
-    line2: "Diamonds",
-    tag: "½ Off",
-    cta: "Shop Now",
-    href: "/collections/color-diamonds",
-    accent: "#b8c9d4",
-    accentGlow: "#5a8fa8",
-  },
-  {
-    id: 2,
-    img: "/images/i2.png",
-    eyebrow: "Curated Luxury",
-    line1: "Alpha Collection",
-    line2: "Jewels",
-    tag: "½ Off",
-    cta: "Explore",
-    href: "/collections/jewels",
-    accent: "#b8c9d4",
-    accentGlow: "#5a8fa8",
-  },
-  {
-    id: 3,
-    img: "/images/i3.png",
-    eyebrow: "Find Your Stone",
-    line1: "Shop",
-    line2: "Birthstones",
-    tag: "½ Off",
-    cta: "Find Yours",
-    href: "/collections/birthstones",
-    accent: "#c9b8d4",
-    accentGlow: "#8a5aa8",
-  },
-  {
-    id: 4,
-    img: "/images/i4.png",
-    eyebrow: "Price Promise",
-    line1: "Alpha White",
-    line2: "Diamonds",
-    tag: "Best Price",
-    cta: "View Diamonds",
-    href: "/collections/white-diamonds",
-    accent: "#d4d4d4",
-    accentGlow: "#9ab0bc",
-  },
-  {
-    id: 5,
-    img: "/images/i5.png",
-    eyebrow: "At Alpha",
-    line1: "Finest Precious",
-    line2: "Jewels",
-    tag: "½ Off",
-    cta: "Shop Jewels",
-    href: "/collections/precious-jewels",
-    accent: "#b8c9d4",
-    accentGlow: "#5a8fa8",
-  },
-  {
-    id: 6,
-    img: "/images/i6.png",
-    eyebrow: "Ethically Sourced",
-    line1: "Natural Jewels",
-    line2: "From the World",
-    tag: "New In",
-    cta: "Discover",
-    href: "/collections/natural-jewels",
-    accent: "#b8d4c0",
-    accentGlow: "#5aa87a",
-  },
-  {
-    id: 7,
-    img: "/images/i7.png",
-    eyebrow: "Trade Preferred",
-    line1: "Jewelers'",
-    line2: "Top Choice",
-    tag: "#1 Pick",
-    cta: "Shop Trade",
-    href: "/collections/trade",
-    accent: "#b8c9d4",
-    accentGlow: "#5a8fa8",
-  },
-] as const;
+// ── Types ────────────────────────────────────────────────────────────────────
+interface HeroSlide {
+  _id: string;
+  title: string;
+  subtitle?: string;
+  description?: string;
+  desktopImage: string;
+  mobileImage?: string;
+  accent?: string;
+  accentGlow?: string;
+  buttonText?: string;
+  buttonLink?: string;
+  openInNewTab?: boolean;
+  displayOrder: number;
+  isActive: boolean;
+}
 
 const AUTO_ROTATE_MS = 6000;
 
-// ── Diamond-shaped sparkle (cinematic) ──────────────────────────────────────
+// ── Diamond-shaped sparkle ────────────────────────────────────────────────────
 function DiamondIcon({ accent, size = 10 }: { accent: string; size?: number }) {
   return (
     <svg width={size} height={size} viewBox="0 0 12 12" fill="none" aria-hidden="true">
@@ -113,7 +38,7 @@ function DiamondIcon({ accent, size = 10 }: { accent: string; size?: number }) {
   );
 }
 
-// ── Scanline texture overlay ─────────────────────────────────────────────────
+// ── Scanline texture overlay ──────────────────────────────────────────────────
 function Scanlines() {
   return (
     <div
@@ -124,6 +49,50 @@ function Scanlines() {
         mixBlendMode: "multiply",
       }}
     />
+  );
+}
+
+// ── Loading skeleton ──────────────────────────────────────────────────────────
+function CarouselSkeleton() {
+  return (
+    <section
+      className="relative w-full select-none"
+      style={{ background: "#04080c" }}
+    >
+      <div
+        className="relative w-full overflow-hidden animate-pulse"
+        style={{ height: "var(--carousel-h)", minHeight: 280 }}
+      >
+        <div className="absolute inset-0 bg-[#0d1620]" />
+        <div className="absolute inset-0 flex items-center" style={{ paddingLeft: "clamp(24px,7vw,140px)" }}>
+          <div className="flex flex-col gap-3">
+            <div className="h-3 w-24 rounded bg-white/10" />
+            <div className="h-12 w-56 rounded bg-white/10" />
+            <div className="h-12 w-48 rounded bg-white/10" />
+            <div className="h-1 w-14 rounded bg-white/10" />
+            <div className="h-8 w-32 rounded bg-white/10" />
+          </div>
+        </div>
+      </div>
+      <div className="h-px w-full bg-white/5" />
+    </section>
+  );
+}
+
+// ── Empty state ───────────────────────────────────────────────────────────────
+function CarouselEmpty() {
+  return (
+    <section
+      className="relative w-full flex items-center justify-center select-none"
+      style={{ background: "#04080c", height: "var(--carousel-h)", minHeight: 280 }}
+    >
+      <div className="flex flex-col items-center gap-3 text-center px-6">
+        <ImageOff size={36} strokeWidth={1} className="text-white/20" />
+        <p className="text-white/30 text-sm tracking-widest uppercase font-light">
+          No slides available
+        </p>
+      </div>
+    </section>
   );
 }
 
@@ -139,33 +108,84 @@ const stagger = (i: number) => ({
   },
 });
 
+// ── Main carousel ─────────────────────────────────────────────────────────────
 export default function HeroCarousel() {
+  const [slides, setSlides] = useState<HeroSlide[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(false);
   const [current, setCurrent] = useState(0);
   const [isPaused, setIsPaused] = useState(false);
+  const [isMobile, setIsMobile] = useState(false);
   const touchStartX = useRef(0);
   const touchStartY = useRef(0);
 
-  const go = useCallback((index: number) => {
-    setCurrent((index + BANNERS.length) % BANNERS.length);
+  // Detect mobile
+  useEffect(() => {
+    const mql = window.matchMedia("(max-width: 639px)");
+    setIsMobile(mql.matches);
+    const handler = (e: MediaQueryListEvent) => setIsMobile(e.matches);
+    mql.addEventListener("change", handler);
+    return () => mql.removeEventListener("change", handler);
   }, []);
 
-  const next = useCallback(() => setCurrent((c) => (c + 1) % BANNERS.length), []);
-  const prev = useCallback(() => setCurrent((c) => (c - 1 + BANNERS.length) % BANNERS.length), []);
-
+  // Fetch slides from API
   useEffect(() => {
-    if (isPaused) return;
+    let cancelled = false;
+    setLoading(true);
+    setError(false);
+    fetch("/api/hero-slides")
+      .then((r) => {
+        if (!r.ok) throw new Error("Failed to load");
+        return r.json();
+      })
+      .then((json) => {
+        if (!cancelled) {
+          setSlides(json.data ?? []);
+          setLoading(false);
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setError(true);
+          setLoading(false);
+        }
+      });
+    return () => { cancelled = true; };
+  }, []);
+
+  const go = useCallback(
+    (index: number) => {
+      setCurrent((index + slides.length) % slides.length);
+    },
+    [slides.length]
+  );
+
+  const next = useCallback(
+    () => setCurrent((c) => (c + 1) % slides.length),
+    [slides.length]
+  );
+  const prev = useCallback(
+    () => setCurrent((c) => (c - 1 + slides.length) % slides.length),
+    [slides.length]
+  );
+
+  // Auto-rotate
+  useEffect(() => {
+    if (isPaused || slides.length <= 1) return;
     const id = setInterval(next, AUTO_ROTATE_MS);
     return () => clearInterval(id);
-  }, [isPaused, next]);
+  }, [isPaused, next, slides.length]);
 
+  // Keyboard navigation
   useEffect(() => {
+    if (slides.length <= 1) return;
     const h = (e: KeyboardEvent) => {
       if (e.key === "ArrowLeft") prev();
       if (e.key === "ArrowRight") next();
     };
     window.addEventListener("keydown", h);
     return () => window.removeEventListener("keydown", h);
-  }, [next, prev]);
+  }, [next, prev, slides.length]);
 
   const handleTouchStart = (e: React.TouchEvent) => {
     touchStartX.current = e.changedTouches[0].clientX;
@@ -177,7 +197,14 @@ export default function HeroCarousel() {
     if (Math.abs(dx) > Math.abs(dy) && Math.abs(dx) > 44) dx < 0 ? next() : prev();
   };
 
-  const b = BANNERS[current];
+  if (loading) return <CarouselSkeleton />;
+  if (error || slides.length === 0) return <CarouselEmpty />;
+
+  const b = slides[current];
+  const accent = b.accent || "#b8c9d4";
+  const accentGlow = b.accentGlow || "#5a8fa8";
+  // Use mobile image on mobile if available, otherwise fall back to desktop
+  const bgImage = (isMobile && b.mobileImage) ? b.mobileImage : b.desktopImage;
 
   return (
     <>
@@ -213,14 +240,20 @@ export default function HeroCarousel() {
               transition={{ duration: 1.2, ease: "easeInOut" }}
               className="absolute inset-0 w-full h-full"
               aria-roledescription="slide"
-              aria-label={`Slide ${current + 1} of ${BANNERS.length}`}
+              aria-label={`Slide ${current + 1} of ${slides.length}`}
             >
               {/* Background photo */}
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
-                src={b.img}
+                src={bgImage}
                 alt=""
                 aria-hidden="true"
+                onError={(e) => {
+                  // Fallback to desktop if mobile fails
+                  if (isMobile && b.mobileImage && bgImage !== b.desktopImage) {
+                    (e.currentTarget as HTMLImageElement).src = b.desktopImage;
+                  }
+                }}
                 style={{
                   position: "absolute",
                   inset: 0,
@@ -233,7 +266,16 @@ export default function HeroCarousel() {
                 draggable={false}
               />
 
+              <Scanlines />
 
+              {/* Dark gradient overlay for text readability */}
+              <div
+                className="absolute inset-0 z-10"
+                style={{
+                  background:
+                    "linear-gradient(to right, rgba(4,8,12,0.72) 0%, rgba(4,8,12,0.35) 55%, rgba(4,8,12,0.05) 100%)",
+                }}
+              />
 
               {/* ── Text block ── */}
               <div className="absolute inset-0 flex items-center z-20">
@@ -245,40 +287,42 @@ export default function HeroCarousel() {
                     maxWidth: "clamp(260px, 60vw, 600px)",
                   }}
                 >
-                  {/* Eyebrow — wide-tracked label */}
-                  <motion.div
-                    key={`${current}-eyebrow`}
-                    variants={stagger(0)}
-                    initial="hidden"
-                    animate="visible"
-                    className="flex items-center gap-3 mb-3 sm:mb-5"
-                  >
-                    <DiamondIcon accent={b.accent} size={7} />
-                    <span
-                      className="hero-label"
-                      style={{
-                        fontSize: "clamp(8px, 0.9vw, 10px)",
-                        letterSpacing: "0.38em",
-                        textTransform: "uppercase",
-                        color: b.accent,
-                        opacity: 0.9,
-                      }}
+                  {/* Eyebrow */}
+                  {b.subtitle && (
+                    <motion.div
+                      key={`${current}-eyebrow`}
+                      variants={stagger(0)}
+                      initial="hidden"
+                      animate="visible"
+                      className="flex items-center gap-3 mb-3 sm:mb-5"
                     >
-                      {b.eyebrow}
-                    </span>
-                    <div
-                      style={{
-                        flex: 1,
-                        height: 1,
-                        maxWidth: 48,
-                        background: `linear-gradient(to right, ${b.accent}66, transparent)`,
-                      }}
-                    />
-                  </motion.div>
+                      <DiamondIcon accent={accent} size={7} />
+                      <span
+                        className="hero-label"
+                        style={{
+                          fontSize: "clamp(8px, 0.9vw, 10px)",
+                          letterSpacing: "0.38em",
+                          textTransform: "uppercase",
+                          color: accent,
+                          opacity: 0.9,
+                        }}
+                      >
+                        {b.subtitle}
+                      </span>
+                      <div
+                        style={{
+                          flex: 1,
+                          height: 1,
+                          maxWidth: 48,
+                          background: `linear-gradient(to right, ${accent}66, transparent)`,
+                        }}
+                      />
+                    </motion.div>
+                  )}
 
-                  {/* Headline line 1 */}
+                  {/* Headline */}
                   <motion.h2
-                    key={`${current}-l1`}
+                    key={`${current}-title`}
                     variants={stagger(1)}
                     initial="hidden"
                     animate="visible"
@@ -288,171 +332,223 @@ export default function HeroCarousel() {
                       fontWeight: 300,
                       lineHeight: 0.9,
                       letterSpacing: "-0.01em",
-                      textShadow: `0 0 80px ${b.accentGlow}40, 0 4px 40px rgba(0,0,0,0.6)`,
+                      textShadow: `0 0 80px ${accentGlow}40, 0 4px 40px rgba(0,0,0,0.6)`,
                       margin: 0,
                     }}
                   >
-                    {b.line1}
+                    {b.title}
                   </motion.h2>
 
-                  {/* Headline line 2 — italic */}
-                  <motion.h2
-                    key={`${current}-l2`}
-                    variants={stagger(2)}
-                    initial="hidden"
-                    animate="visible"
-                    className="hero-display text-white"
-                    style={{
-                      fontSize: "clamp(28px, 5.8vw, 92px)",
-                      fontWeight: 300,
-                      fontStyle: "italic",
-                      lineHeight: 0.9,
-                      letterSpacing: "-0.01em",
-                      textShadow: `0 0 80px ${b.accentGlow}40, 0 4px 40px rgba(0,0,0,0.6)`,
-                      color: b.accent,
-                      marginBottom: "clamp(12px, 2.5vh, 32px)",
-                    }}
-                  >
-                    {b.line2}
-                  </motion.h2>
-
-                  {/* Divider — thin ruled line */}
-                  <motion.div
-                    key={`${current}-rule`}
-                    variants={stagger(3)}
-                    initial="hidden"
-                    animate="visible"
-                    style={{
-                      width: 56,
-                      height: 1,
-                      background: `linear-gradient(to right, ${b.accent}cc, transparent)`,
-                      marginBottom: "clamp(12px, 2.5vh, 28px)",
-                    }}
-                  />
-
-                  {/* Offer tag + CTA */}
-                  <motion.div
-                    key={`${current}-cta`}
-                    variants={stagger(4)}
-                    initial="hidden"
-                    animate="visible"
-                    className="flex items-center gap-5 flex-wrap"
-                  >
-                    {/* Badge — outlined cinematic style */}
-                    <span
-                      className="hero-label"
+                  {/* Description */}
+                  {b.description && (
+                    <motion.p
+                      key={`${current}-desc`}
+                      variants={stagger(2)}
+                      initial="hidden"
+                      animate="visible"
+                      className="hero-label text-white/60"
                       style={{
-                        fontSize: "clamp(8px, 0.95vw, 10px)",
-                        letterSpacing: "0.32em",
-                        textTransform: "uppercase",
-                        color: b.accent,
-                        border: `1px solid ${b.accent}66`,
-                        padding: "5px 14px",
-                        display: "inline-block",
-                        background: `${b.accentGlow}10`,
+                        fontSize: "clamp(11px, 1.1vw, 14px)",
+                        lineHeight: 1.6,
+                        marginTop: "clamp(10px, 1.5vh, 18px)",
+                        marginBottom: "clamp(12px, 2vh, 24px)",
+                        maxWidth: 380,
+                        fontWeight: 300,
                       }}
                     >
-                      {b.tag}
-                    </span>
+                      {b.description}
+                    </motion.p>
+                  )}
 
-                    {/* CTA */}
-                    <a
-                      href={b.href}
-                      className="hero-label group inline-flex items-center gap-2"
+                  {/* Divider */}
+                  {!b.description && (
+                    <motion.div
+                      key={`${current}-rule`}
+                      variants={stagger(2)}
+                      initial="hidden"
+                      animate="visible"
                       style={{
-                        fontSize: "clamp(8px, 0.95vw, 10px)",
-                        letterSpacing: "0.32em",
-                        textTransform: "uppercase",
-                        color: "rgba(255,255,255,0.7)",
-                        textDecoration: "none",
-                        transition: "color 0.3s",
+                        width: 56,
+                        height: 1,
+                        background: `linear-gradient(to right, ${accent}cc, transparent)`,
+                        marginTop: "clamp(10px, 1.5vh, 18px)",
+                        marginBottom: "clamp(12px, 2.5vh, 28px)",
                       }}
-                      onMouseEnter={(e) => {
-                        (e.currentTarget as HTMLAnchorElement).style.color = b.accent;
-                      }}
-                      onMouseLeave={(e) => {
-                        (e.currentTarget as HTMLAnchorElement).style.color =
-                          "rgba(255,255,255,0.7)";
-                      }}
+                    />
+                  )}
+
+                  {/* CTA button */}
+                  {b.buttonText && b.buttonLink && (
+                    <motion.div
+                      key={`${current}-cta`}
+                      variants={stagger(3)}
+                      initial="hidden"
+                      animate="visible"
+                      className="flex items-center gap-5 flex-wrap"
                     >
-                      {b.cta}
-                      <ChevronRight
-                        size={10}
-                        strokeWidth={1.5}
-                        className="transition-transform duration-300 group-hover:translate-x-1"
-                      />
-                    </a>
-                  </motion.div>
+                      <a
+                        href={b.buttonLink}
+                        target={b.openInNewTab ? "_blank" : undefined}
+                        rel={b.openInNewTab ? "noopener noreferrer" : undefined}
+                        className="hero-label group inline-flex items-center gap-2"
+                        style={{
+                          fontSize: "clamp(8px, 0.95vw, 10px)",
+                          letterSpacing: "0.32em",
+                          textTransform: "uppercase",
+                          color: "rgba(255,255,255,0.7)",
+                          textDecoration: "none",
+                          border: `1px solid ${accent}66`,
+                          padding: "6px 18px",
+                          background: `${accentGlow}10`,
+                          transition: "all 0.3s",
+                        }}
+                        onMouseEnter={(e) => {
+                          const el = e.currentTarget as HTMLAnchorElement;
+                          el.style.color = accent;
+                          el.style.borderColor = `${accent}99`;
+                          el.style.background = `${accentGlow}22`;
+                        }}
+                        onMouseLeave={(e) => {
+                          const el = e.currentTarget as HTMLAnchorElement;
+                          el.style.color = "rgba(255,255,255,0.7)";
+                          el.style.borderColor = `${accent}66`;
+                          el.style.background = `${accentGlow}10`;
+                        }}
+                      >
+                        {b.buttonText}
+                        <ChevronRight
+                          size={10}
+                          strokeWidth={1.5}
+                          className="transition-transform duration-300 group-hover:translate-x-1"
+                        />
+                      </a>
+                    </motion.div>
+                  )}
                 </div>
               </div>
             </motion.div>
           </AnimatePresence>
 
           {/* ── Slide counter top-right ── */}
-          <div
-            className="absolute top-5 right-5 z-30 hero-label"
-            aria-live="polite"
-            aria-atomic="true"
-            style={{
-              fontSize: 9,
-              letterSpacing: "0.28em",
-              color: "rgba(255,255,255,0.28)",
-            }}
-          >
-            {String(current + 1).padStart(2, "0")} / {String(BANNERS.length).padStart(2, "0")}
-          </div>
-
-          {/* ── Arrows ── */}
-          {(["prev", "next"] as const).map((dir) => (
-            <button
-              key={dir}
-              onClick={dir === "prev" ? prev : next}
-              aria-label={dir === "prev" ? "Previous slide" : "Next slide"}
-              className="hidden sm:flex absolute top-1/2 -translate-y-1/2 z-30 items-center justify-center focus:outline-none"
+          {slides.length > 1 && (
+            <div
+              className="absolute top-5 right-5 z-30 hero-label"
+              aria-live="polite"
+              aria-atomic="true"
               style={{
-                [dir === "prev" ? "left" : "right"]: "clamp(12px, 2.5vw, 32px)",
-                width: "clamp(34px, 3vw, 46px)",
-                height: "clamp(34px, 3vw, 46px)",
-                background: "rgba(4,8,12,0.55)",
-                backdropFilter: "blur(16px)",
-                border: "1px solid rgba(255,255,255,0.08)",
-                color: "rgba(255,255,255,0.5)",
-                borderRadius: 0,
-                transition: "all 0.25s",
-              }}
-              onMouseEnter={(e) => {
-                const el = e.currentTarget as HTMLButtonElement;
-                el.style.background = `${b.accentGlow}22`;
-                el.style.borderColor = `${b.accent}55`;
-                el.style.color = b.accent;
-              }}
-              onMouseLeave={(e) => {
-                const el = e.currentTarget as HTMLButtonElement;
-                el.style.background = "rgba(4,8,12,0.55)";
-                el.style.borderColor = "rgba(255,255,255,0.08)";
-                el.style.color = "rgba(255,255,255,0.5)";
+                fontSize: 9,
+                letterSpacing: "0.28em",
+                color: "rgba(255,255,255,0.28)",
               }}
             >
-              {dir === "prev" ? (
-                <ChevronLeft size={14} strokeWidth={1.5} />
-              ) : (
-                <ChevronRight size={14} strokeWidth={1.5} />
-              )}
-            </button>
-          ))}
+              {String(current + 1).padStart(2, "0")} / {String(slides.length).padStart(2, "0")}
+            </div>
+          )}
+
+          {/* ── Arrows ── */}
+          {slides.length > 1 &&
+            (["prev", "next"] as const).map((dir) => (
+              <button
+                key={dir}
+                onClick={dir === "prev" ? prev : next}
+                aria-label={dir === "prev" ? "Previous slide" : "Next slide"}
+                className="hidden sm:flex absolute top-1/2 -translate-y-1/2 z-30 items-center justify-center focus:outline-none"
+                style={{
+                  [dir === "prev" ? "left" : "right"]: "clamp(12px, 2.5vw, 32px)",
+                  width: "clamp(34px, 3vw, 46px)",
+                  height: "clamp(34px, 3vw, 46px)",
+                  background: "rgba(4,8,12,0.55)",
+                  backdropFilter: "blur(16px)",
+                  border: "1px solid rgba(255,255,255,0.08)",
+                  color: "rgba(255,255,255,0.5)",
+                  borderRadius: 0,
+                  transition: "all 0.25s",
+                }}
+                onMouseEnter={(e) => {
+                  const el = e.currentTarget as HTMLButtonElement;
+                  el.style.background = `${accentGlow}22`;
+                  el.style.borderColor = `${accent}55`;
+                  el.style.color = accent;
+                }}
+                onMouseLeave={(e) => {
+                  const el = e.currentTarget as HTMLButtonElement;
+                  el.style.background = "rgba(4,8,12,0.55)";
+                  el.style.borderColor = "rgba(255,255,255,0.08)";
+                  el.style.color = "rgba(255,255,255,0.5)";
+                }}
+              >
+                {dir === "prev" ? (
+                  <ChevronLeft size={14} strokeWidth={1.5} />
+                ) : (
+                  <ChevronRight size={14} strokeWidth={1.5} />
+                )}
+              </button>
+            ))}
 
           {/* ── Vertical tick nav — desktop right edge ── */}
-          <div className="absolute right-5 bottom-16 z-30 hidden sm:flex flex-col items-center gap-[10px]">
-            {BANNERS.map((_, i) => (
+          {slides.length > 1 && (
+            <div className="absolute right-5 bottom-16 z-30 hidden sm:flex flex-col items-center gap-[10px]">
+              {slides.map((_, i) => (
+                <button
+                  key={i}
+                  onClick={() => go(i)}
+                  aria-label={`Go to slide ${i + 1}`}
+                  style={{
+                    width: 1,
+                    height: i === current ? 32 : 10,
+                    background:
+                      i === current ? accent : "rgba(255,255,255,0.2)",
+                    border: "none",
+                    padding: 0,
+                    cursor: "pointer",
+                    transition: "all 0.45s ease",
+                  }}
+                />
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* ── Progress bar ── */}
+        {slides.length > 1 && (
+          <div
+            className="relative w-full overflow-hidden"
+            style={{ height: 1, background: "rgba(255,255,255,0.04)" }}
+          >
+            {!isPaused && (
+              <motion.div
+                key={`progress-${current}`}
+                initial={{ scaleX: 0 }}
+                animate={{ scaleX: 1 }}
+                transition={{ duration: AUTO_ROTATE_MS / 1000, ease: "linear" }}
+                className="absolute inset-0 origin-left"
+                style={{ background: accent }}
+              />
+            )}
+          </div>
+        )}
+
+        {/* ── Dot nav — mobile only ── */}
+        {slides.length > 1 && (
+          <div
+            className="flex sm:hidden items-center justify-center gap-[10px] py-3"
+            style={{ background: "#04080c" }}
+            role="tablist"
+            aria-label="Slide navigation"
+          >
+            {slides.map((_, i) => (
               <button
                 key={i}
-                onClick={() => go(i)}
+                role="tab"
+                aria-selected={i === current}
                 aria-label={`Go to slide ${i + 1}`}
+                onClick={() => go(i)}
+                className="focus:outline-none"
                 style={{
-                  width: 1,
-                  height: i === current ? 32 : 10,
+                  height: 1,
+                  width: i === current ? 28 : 8,
                   background:
-                    i === current ? b.accent : "rgba(255,255,255,0.2)",
+                    i === current ? accent : "rgba(255,255,255,0.15)",
                   border: "none",
                   padding: 0,
                   cursor: "pointer",
@@ -461,53 +557,7 @@ export default function HeroCarousel() {
               />
             ))}
           </div>
-        </div>
-
-        {/* ── Progress bar ── */}
-        <div
-          className="relative w-full overflow-hidden"
-          style={{ height: 1, background: "rgba(255,255,255,0.04)" }}
-        >
-          {!isPaused && (
-            <motion.div
-              key={`progress-${current}`}
-              initial={{ scaleX: 0 }}
-              animate={{ scaleX: 1 }}
-              transition={{ duration: AUTO_ROTATE_MS / 1000, ease: "linear" }}
-              className="absolute inset-0 origin-left"
-              style={{ background: b.accent }}
-            />
-          )}
-        </div>
-
-        {/* ── Dot nav — mobile only ── */}
-        <div
-          className="flex sm:hidden items-center justify-center gap-[10px] py-3"
-          style={{ background: "#04080c" }}
-          role="tablist"
-          aria-label="Slide navigation"
-        >
-          {BANNERS.map((_, i) => (
-            <button
-              key={i}
-              role="tab"
-              aria-selected={i === current}
-              aria-label={`Go to slide ${i + 1}`}
-              onClick={() => go(i)}
-              className="focus:outline-none"
-              style={{
-                height: 1,
-                width: i === current ? 28 : 8,
-                background:
-                  i === current ? b.accent : "rgba(255,255,255,0.15)",
-                border: "none",
-                padding: 0,
-                cursor: "pointer",
-                transition: "all 0.45s ease",
-              }}
-            />
-          ))}
-        </div>
+        )}
       </section>
     </>
   );
