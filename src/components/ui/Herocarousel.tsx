@@ -21,7 +21,25 @@ interface HeroSlide {
   isActive: boolean;
 }
 
+interface HeroCarouselProps {
+  // Server-fetched slides passed from the parent Server Component so the
+  // carousel renders immediately without a client-side fetch + skeleton.
+  initialSlides?: HeroSlide[];
+}
+
 const AUTO_ROTATE_MS = 6000;
+
+// ── Cloudinary URL optimiser ─────────────────────────────────────────────────
+// Injects a quality + format transform into an existing Cloudinary URL so we
+// deliver the right resolution without touching the stored original.
+function optimiseCloudinaryUrl(src: string, width: number): string {
+  if (!src) return src;
+  if (!src.includes("res.cloudinary.com")) return src;
+  // Insert transform right after /upload/
+  // e.g. .../upload/w_1920,q_90,f_auto/...
+  const transform = `w_${width},q_90,f_auto`;
+  return src.replace("/upload/", `/upload/${transform}/`);
+}
 
 // ── Diamond-shaped sparkle ────────────────────────────────────────────────────
 function DiamondIcon({ accent, size = 10 }: { accent: string; size?: number }) {
@@ -109,9 +127,10 @@ const stagger = (i: number) => ({
 });
 
 // ── Main carousel ─────────────────────────────────────────────────────────────
-export default function HeroCarousel() {
-  const [slides, setSlides] = useState<HeroSlide[]>([]);
-  const [loading, setLoading] = useState(true);
+export default function HeroCarousel({ initialSlides }: HeroCarouselProps) {
+  // Seed state directly from server-fetched props — no loading flash.
+  const [slides, setSlides] = useState<HeroSlide[]>(initialSlides ?? []);
+  const [loading, setLoading] = useState(!initialSlides);
   const [error, setError] = useState(false);
   const [current, setCurrent] = useState(0);
   const [isPaused, setIsPaused] = useState(false);
@@ -128,8 +147,11 @@ export default function HeroCarousel() {
     return () => mql.removeEventListener("change", handler);
   }, []);
 
-  // Fetch slides from API
+  // Only fetch from the API if we did NOT receive server-side data (e.g. when
+  // rendered outside the homepage, or during client-side navigation).
   useEffect(() => {
+    if (initialSlides) return; // already have data — skip the network call
+
     let cancelled = false;
     setLoading(true);
     setError(false);
@@ -151,7 +173,7 @@ export default function HeroCarousel() {
         }
       });
     return () => { cancelled = true; };
-  }, []);
+  }, [initialSlides]);
 
   const go = useCallback(
     (index: number) => {
@@ -187,6 +209,17 @@ export default function HeroCarousel() {
     return () => window.removeEventListener("keydown", h);
   }, [next, prev, slides.length]);
 
+  // Preload the next slide image so transitions stay smooth
+  useEffect(() => {
+    if (slides.length <= 1) return;
+    const nextIndex = (current + 1) % slides.length;
+    const nextSlide = slides[nextIndex];
+    if (!nextSlide) return;
+    const url = optimiseCloudinaryUrl(nextSlide.desktopImage, 1920);
+    const img = new Image();
+    img.src = url;
+  }, [current, slides]);
+
   const handleTouchStart = (e: React.TouchEvent) => {
     touchStartX.current = e.changedTouches[0].clientX;
     touchStartY.current = e.changedTouches[0].clientY;
@@ -203,8 +236,14 @@ export default function HeroCarousel() {
   const b = slides[current];
   const accent = b.accent || "#b8c9d4";
   const accentGlow = b.accentGlow || "#5a8fa8";
-  // Use mobile image on mobile if available, otherwise fall back to desktop
-  const bgImage = (isMobile && b.mobileImage) ? b.mobileImage : b.desktopImage;
+
+  // Use mobile image on mobile if available, otherwise fall back to desktop.
+  // Apply Cloudinary optimisation: full width at the right breakpoint, high quality.
+  const desktopSrc = optimiseCloudinaryUrl(b.desktopImage, 1920);
+  const mobileSrc  = b.mobileImage
+    ? optimiseCloudinaryUrl(b.mobileImage, 768)
+    : desktopSrc;
+  const bgImage = isMobile ? mobileSrc : desktopSrc;
 
   return (
     <>
@@ -242,16 +281,28 @@ export default function HeroCarousel() {
               aria-roledescription="slide"
               aria-label={`Slide ${current + 1} of ${slides.length}`}
             >
-              {/* Background photo */}
+              {/* Background photo — full quality, responsive */}
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
                 src={bgImage}
+                // Hint the browser to load the desktop image eagerly at high res
+                // using a srcSet so the full resolution is fetched on wide screens.
+                srcSet={
+                  b.mobileImage
+                    ? `${mobileSrc} 768w, ${desktopSrc} 1920w`
+                    : `${desktopSrc} 1920w`
+                }
+                sizes="100vw"
                 alt=""
                 aria-hidden="true"
+                // Eagerly decode & fetch the first slide; lazy-load the rest.
+                loading={current === 0 ? "eager" : "lazy"}
+                decoding="async"
+                fetchPriority={current === 0 ? "high" : "auto"}
                 onError={(e) => {
                   // Fallback to desktop if mobile fails
-                  if (isMobile && b.mobileImage && bgImage !== b.desktopImage) {
-                    (e.currentTarget as HTMLImageElement).src = b.desktopImage;
+                  if (isMobile && b.mobileImage && bgImage !== desktopSrc) {
+                    (e.currentTarget as HTMLImageElement).src = desktopSrc;
                   }
                 }}
                 style={{

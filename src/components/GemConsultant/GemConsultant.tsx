@@ -49,10 +49,8 @@ interface CategoryCard {
   image?: string;
   description?: string;
   productCount?: number;
-  /** present when this is a subcategory */
   parentId?: string;
   parentName?: string;
-  /** slug of the parent category — returned by API for subcategories */
   parentSlug?: string;
 }
 
@@ -76,8 +74,8 @@ interface ChatMessage {
   role: "user" | "assistant";
   content: string;
   products?: ProductCard[];
-  categories?: CategoryCard[];   // top-level categories
-  subcategories?: CategoryCard[]; // subcategories of a parent
+  categories?: CategoryCard[];
+  subcategories?: CategoryCard[];
   comparison?: ComparisonData;
   isThinking?: boolean;
   isError?: boolean;
@@ -121,28 +119,28 @@ function parseSSELine(line: string): Record<string, unknown> | null {
 }
 
 /* ─────────────────────────────────────────────
-   Markdown renderer
+   Markdown renderer — blue theme
 ───────────────────────────────────────────── */
 const markdownComponents: Components = {
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   img: () => null,
   strong: ({ children }) => (
-    <strong className="font-semibold text-amber-800">{children}</strong>
+    <strong className="font-semibold text-blue-700">{children}</strong>
   ),
   em: ({ children }) => (
-    <em className="italic text-stone-600" style={{ fontFamily: "'Georgia', serif" }}>
+    <em className="italic text-slate-500" style={{ fontFamily: "'DM Serif Display', Georgia, serif" }}>
       {children}
     </em>
   ),
   p: ({ children }) => (
-    <p className="mb-2 last:mb-0 leading-relaxed text-stone-700">{children}</p>
+    <p className="mb-2 last:mb-0 leading-relaxed text-slate-700">{children}</p>
   ),
   ul: ({ children }) => <ul className="space-y-1.5 my-2 ml-1">{children}</ul>,
   li: ({ children }) => (
-    <li className="flex items-start gap-2 text-stone-700">
+    <li className="flex items-start gap-2 text-slate-700">
       <span
         className="mt-[5px] w-1.5 h-1.5 rounded-full flex-shrink-0"
-        style={{ background: "linear-gradient(135deg, #d4a853, #9a6424)" }}
+        style={{ background: "linear-gradient(135deg, #3b82f6, #1d4ed8)" }}
       />
       <span className="flex-1">{children}</span>
     </li>
@@ -151,51 +149,51 @@ const markdownComponents: Components = {
     <ol className="space-y-1.5 my-2 ml-1 list-decimal list-inside">{children}</ol>
   ),
   h1: ({ children }) => (
-    <h1 className="text-sm font-bold text-amber-800 mb-2 uppercase tracking-wide">{children}</h1>
+    <h1 className="text-sm font-bold text-blue-700 mb-2 uppercase tracking-wide">{children}</h1>
   ),
   h2: ({ children }) => (
-    <h2 className="text-xs font-bold text-amber-700 mb-1.5 uppercase tracking-wider">{children}</h2>
+    <h2 className="text-xs font-bold text-blue-600 mb-1.5 uppercase tracking-wider">{children}</h2>
   ),
   h3: ({ children }) => (
-    <h3 className="text-xs font-semibold text-stone-700 mb-1">{children}</h3>
+    <h3 className="text-xs font-semibold text-slate-700 mb-1">{children}</h3>
   ),
   code: ({ children }) => (
-    <code className="text-[11px] bg-amber-50 text-amber-800 border border-amber-200 px-1.5 py-0.5 rounded-md font-mono">
+    <code className="text-[11px] bg-blue-50 text-blue-700 border border-blue-200 px-1.5 py-0.5 rounded-md font-mono">
       {children}
     </code>
   ),
   blockquote: ({ children }) => (
     <blockquote
-      className="border-l-2 border-amber-300 pl-3 my-2 italic text-stone-500 text-[13px]"
-      style={{ fontFamily: "'Georgia', serif" }}
+      className="border-l-2 border-blue-300 pl-3 my-2 italic text-slate-500 text-[13px]"
+      style={{ fontFamily: "'DM Serif Display', Georgia, serif" }}
     >
       {children}
     </blockquote>
   ),
   table: ({ children }) => (
-    <div className="my-2 rounded-xl overflow-hidden border border-stone-200">
+    <div className="my-2 rounded-xl overflow-hidden border border-slate-200">
       <table className="w-full text-xs">{children}</table>
     </div>
   ),
   thead: ({ children }) => (
-    <thead className="bg-gradient-to-r from-stone-50 to-amber-50/30">{children}</thead>
+    <thead className="bg-gradient-to-r from-slate-50 to-blue-50/30">{children}</thead>
   ),
   th: ({ children }) => (
-    <th className="px-3 py-2 text-left font-semibold text-stone-500 uppercase tracking-wider text-[10px] border-b border-stone-200">
+    <th className="px-3 py-2 text-left font-semibold text-slate-400 uppercase tracking-wider text-[10px] border-b border-slate-200">
       {children}
     </th>
   ),
   td: ({ children }) => (
-    <td className="px-3 py-2 border-b border-stone-100 text-stone-700">{children}</td>
+    <td className="px-3 py-2 border-b border-slate-100 text-slate-700">{children}</td>
   ),
   a: ({ children }) => (
-    <span className="text-amber-700 underline underline-offset-2 cursor-default">{children}</span>
+    <span className="text-blue-600 underline underline-offset-2 cursor-default">{children}</span>
   ),
   hr: () => (
     <div className="my-3 flex items-center gap-2">
-      <div className="flex-1 h-px bg-gradient-to-r from-transparent via-amber-200 to-transparent" />
-      <span className="text-amber-300 text-[10px]">✦</span>
-      <div className="flex-1 h-px bg-gradient-to-r from-transparent via-amber-200 to-transparent" />
+      <div className="flex-1 h-px bg-gradient-to-r from-transparent via-blue-200 to-transparent" />
+      <span className="text-blue-300 text-[10px]">◆</span>
+      <div className="flex-1 h-px bg-gradient-to-r from-transparent via-blue-200 to-transparent" />
     </div>
   ),
 };
@@ -207,7 +205,7 @@ function ProductImage({ src, alt }: { src: string; alt: string }) {
   const [error, setError] = useState(false);
   if (!src || error) {
     return (
-      <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-stone-50 to-amber-50/40">
+      <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-slate-50 to-blue-50/40">
         <span className="text-4xl opacity-20">💎</span>
       </div>
     );
@@ -228,8 +226,8 @@ function CategoryImage({ src, alt }: { src?: string; alt: string }) {
   const [error, setError] = useState(false);
   if (!src || error) {
     return (
-      <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-amber-50 to-stone-100">
-        <Layers size={22} className="text-amber-300" />
+      <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-blue-50 to-slate-100">
+        <Layers size={22} className="text-blue-300" />
       </div>
     );
   }
@@ -246,7 +244,7 @@ function CategoryImage({ src, alt }: { src?: string; alt: string }) {
 }
 
 /* ─────────────────────────────────────────────
-   Thinking dots
+   Thinking dots — blue
 ───────────────────────────────────────────── */
 function ThinkingDots() {
   return (
@@ -255,7 +253,7 @@ function ThinkingDots() {
         <motion.span
           key={i}
           className="w-2 h-2 rounded-full"
-          style={{ background: "linear-gradient(135deg, #d4a853, #c8843a)" }}
+          style={{ background: "linear-gradient(135deg, #3b82f6, #1d4ed8)" }}
           animate={{ opacity: [0.3, 1, 0.3], y: [0, -4, 0] }}
           transition={{ duration: 1, repeat: Infinity, delay: i * 0.18, ease: "easeInOut" }}
         />
@@ -265,7 +263,7 @@ function ThinkingDots() {
 }
 
 /* ─────────────────────────────────────────────
-   CategoryTile — used for both categories & subcategories
+   CategoryTile
 ───────────────────────────────────────────── */
 function CategoryTile({
   category,
@@ -273,65 +271,60 @@ function CategoryTile({
   onAsk,
 }: {
   category: CategoryCard;
-  /** navigate to the correct page (handles both top-level and subcategory routing) */
   onNavigate: (category: CategoryCard) => void;
-  /** send a follow-up message asking about this category */
   onAsk: (name: string) => void;
 }) {
   return (
     <div
       className="flex-shrink-0 w-[148px] rounded-2xl overflow-hidden bg-white group cursor-pointer transition-all duration-200"
       style={{
-        border: "1px solid rgba(212,168,83,0.15)",
+        border: "1px solid rgba(59,130,246,0.15)",
         boxShadow: "0 2px 12px rgba(0,0,0,0.06)",
       }}
       onMouseEnter={(e) => {
-        (e.currentTarget as HTMLDivElement).style.borderColor = "rgba(212,168,83,0.5)";
-        (e.currentTarget as HTMLDivElement).style.boxShadow = "0 8px 24px rgba(180,120,40,0.15)";
+        (e.currentTarget as HTMLDivElement).style.borderColor = "rgba(59,130,246,0.5)";
+        (e.currentTarget as HTMLDivElement).style.boxShadow = "0 8px 24px rgba(29,78,216,0.14)";
       }}
       onMouseLeave={(e) => {
-        (e.currentTarget as HTMLDivElement).style.borderColor = "rgba(212,168,83,0.15)";
+        (e.currentTarget as HTMLDivElement).style.borderColor = "rgba(59,130,246,0.15)";
         (e.currentTarget as HTMLDivElement).style.boxShadow = "0 2px 12px rgba(0,0,0,0.06)";
       }}
     >
-      {/* Image */}
-      <div className="relative h-28 overflow-hidden bg-gradient-to-br from-stone-50 to-amber-50/30">
+      <div className="relative h-28 overflow-hidden bg-gradient-to-br from-slate-50 to-blue-50/30">
         <CategoryImage src={category.image} alt={category.name} />
         {category.productCount !== undefined && (
           <div
             className="absolute top-2 left-2 text-white text-[9px] font-bold px-1.5 py-0.5 rounded-full z-10"
-            style={{ background: "linear-gradient(135deg, #d4a853, #b8732e)" }}
+            style={{ background: "linear-gradient(135deg, #3b82f6, #1d4ed8)" }}
           >
             {category.productCount} items
           </div>
         )}
       </div>
 
-      {/* Info */}
       <div className="p-2.5 space-y-2">
-        <p className="text-stone-800 text-[11px] font-semibold leading-snug line-clamp-2" style={{ fontFamily: "'Georgia', serif" }}>
+        <p
+          className="text-slate-800 text-[11px] font-semibold leading-snug line-clamp-2"
+          style={{ fontFamily: "'DM Serif Display', Georgia, serif" }}
+        >
           {category.name}
         </p>
         {category.description && (
-          <p className="text-[9px] text-stone-400 line-clamp-2 leading-relaxed">
+          <p className="text-[9px] text-slate-400 line-clamp-2 leading-relaxed">
             {category.description}
           </p>
         )}
-
-        {/* Two actions */}
         <div className="flex gap-1 pt-0.5">
-          {/* Browse — routes to the correct URL based on whether it's a subcategory */}
           <button
             onClick={() => onNavigate(category)}
-            className="flex-1 flex items-center justify-center gap-0.5 text-[9px] font-semibold text-amber-700 bg-amber-50 hover:bg-amber-100 border border-amber-200/70 rounded-lg py-1 transition-colors"
+            className="flex-1 flex items-center justify-center gap-0.5 text-[9px] font-semibold text-blue-700 bg-blue-50 hover:bg-blue-100 border border-blue-200/70 rounded-lg py-1 transition-colors"
           >
             <ExternalLink size={8} />
             Browse
           </button>
-          {/* Ask Victoria about it */}
           <button
             onClick={() => onAsk(category.name)}
-            className="flex-1 flex items-center justify-center gap-0.5 text-[9px] font-semibold text-stone-500 bg-stone-50 hover:bg-stone-100 border border-stone-200/70 rounded-lg py-1 transition-colors"
+            className="flex-1 flex items-center justify-center gap-0.5 text-[9px] font-semibold text-slate-500 bg-slate-50 hover:bg-slate-100 border border-slate-200/70 rounded-lg py-1 transition-colors"
           >
             <ArrowRight size={8} />
             Explore
@@ -343,7 +336,7 @@ function CategoryTile({
 }
 
 /* ─────────────────────────────────────────────
-   Horizontal scroll carousel — shared by products & categories
+   Scroll Carousel
 ───────────────────────────────────────────── */
 function ScrollCarousel({ children, count }: { children: React.ReactNode; count: number }) {
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -356,13 +349,13 @@ function ScrollCarousel({ children, count }: { children: React.ReactNode; count:
         <>
           <button
             onClick={() => scroll("left")}
-            className="absolute left-0 top-[calc(50%-16px)] z-10 w-6 h-6 bg-white/90 backdrop-blur-sm border border-stone-200 rounded-full flex items-center justify-center shadow hover:border-amber-300 hover:text-amber-600 transition-colors"
+            className="absolute left-0 top-[calc(50%-16px)] z-10 w-6 h-6 bg-white/90 backdrop-blur-sm border border-slate-200 rounded-full flex items-center justify-center shadow hover:border-blue-300 hover:text-blue-600 transition-colors"
           >
             <ChevronLeft size={11} />
           </button>
           <button
             onClick={() => scroll("right")}
-            className="absolute right-0 top-[calc(50%-16px)] z-10 w-6 h-6 bg-white/90 backdrop-blur-sm border border-stone-200 rounded-full flex items-center justify-center shadow hover:border-amber-300 hover:text-amber-600 transition-colors"
+            className="absolute right-0 top-[calc(50%-16px)] z-10 w-6 h-6 bg-white/90 backdrop-blur-sm border border-slate-200 rounded-full flex items-center justify-center shadow hover:border-blue-300 hover:text-blue-600 transition-colors"
           >
             <ChevronRight size={11} />
           </button>
@@ -384,7 +377,7 @@ function ScrollCarousel({ children, count }: { children: React.ReactNode; count:
 }
 
 /* ─────────────────────────────────────────────
-   GemCard (products)
+   GemCard
 ───────────────────────────────────────────── */
 function GemCard({
   product,
@@ -396,11 +389,11 @@ function GemCard({
   const img = product.images?.[0];
   const certColors: Record<string, string> = {
     GIA: "bg-blue-50 text-blue-700 border-blue-200",
-    AGS: "bg-purple-50 text-purple-700 border-purple-200",
+    AGS: "bg-violet-50 text-violet-700 border-violet-200",
     IGI: "bg-emerald-50 text-emerald-700 border-emerald-200",
     GCAL: "bg-rose-50 text-rose-700 border-rose-200",
     EGL: "bg-sky-50 text-sky-700 border-sky-200",
-    HRD: "bg-orange-50 text-orange-700 border-orange-200",
+    HRD: "bg-indigo-50 text-indigo-700 border-indigo-200",
   };
   const certClass = certColors[product.certification] ?? "bg-gray-50 text-gray-500 border-gray-200";
 
@@ -409,30 +402,30 @@ function GemCard({
       onClick={() => onNavigate(product._id)}
       className="flex-shrink-0 w-[168px] rounded-2xl overflow-hidden bg-white group cursor-pointer transition-all duration-200"
       style={{
-        border: "1px solid rgba(212,168,83,0.15)",
+        border: "1px solid rgba(59,130,246,0.15)",
         boxShadow: "0 2px 12px rgba(0,0,0,0.06)",
       }}
       onMouseEnter={(e) => {
-        (e.currentTarget as HTMLDivElement).style.borderColor = "rgba(212,168,83,0.5)";
-        (e.currentTarget as HTMLDivElement).style.boxShadow = "0 8px 24px rgba(180,120,40,0.15)";
+        (e.currentTarget as HTMLDivElement).style.borderColor = "rgba(59,130,246,0.5)";
+        (e.currentTarget as HTMLDivElement).style.boxShadow = "0 8px 24px rgba(29,78,216,0.14)";
       }}
       onMouseLeave={(e) => {
-        (e.currentTarget as HTMLDivElement).style.borderColor = "rgba(212,168,83,0.15)";
+        (e.currentTarget as HTMLDivElement).style.borderColor = "rgba(59,130,246,0.15)";
         (e.currentTarget as HTMLDivElement).style.boxShadow = "0 2px 12px rgba(0,0,0,0.06)";
       }}
       title={`View ${product.name}`}
     >
-      <div className="relative h-36 overflow-hidden bg-gradient-to-br from-stone-50 to-amber-50/30">
+      <div className="relative h-36 overflow-hidden bg-gradient-to-br from-slate-50 to-blue-50/30">
         <ProductImage src={img} alt={product.name} />
         {product.score !== undefined && (
           <div
             className="absolute top-2 right-2 text-white text-[9px] font-bold px-1.5 py-0.5 rounded-full z-10"
-            style={{ background: "linear-gradient(135deg, #d4a853, #b8732e)" }}
+            style={{ background: "linear-gradient(135deg, #3b82f6, #1d4ed8)" }}
           >
             {product.score}%
           </div>
         )}
-        <div className="absolute inset-0 bg-black/30 opacity-0 group-hover:opacity-100 transition-opacity duration-200 flex items-center justify-center z-10">
+        <div className="absolute inset-0 bg-blue-900/30 opacity-0 group-hover:opacity-100 transition-opacity duration-200 flex items-center justify-center z-10">
           <div className="flex items-center gap-1 text-white text-[10px] font-semibold bg-white/20 backdrop-blur-sm px-2.5 py-1 rounded-full border border-white/30">
             <ExternalLink size={9} />
             View
@@ -441,20 +434,20 @@ function GemCard({
       </div>
 
       <div className="p-2.5 space-y-1.5">
-        <p className="text-stone-800 text-[11px] font-semibold leading-snug line-clamp-2">
+        <p className="text-slate-800 text-[11px] font-semibold leading-snug line-clamp-2">
           {product.name}
         </p>
         <div className="flex flex-wrap gap-1">
-          <span className="text-[9px] bg-amber-50 text-amber-700 border border-amber-200/70 px-1.5 py-0.5 rounded-full font-semibold">
+          <span className="text-[9px] bg-blue-50 text-blue-700 border border-blue-200/70 px-1.5 py-0.5 rounded-full font-semibold">
             {product.size}ct
           </span>
           {product.shape && (
-            <span className="text-[9px] bg-stone-50 text-stone-500 border border-stone-200/70 px-1.5 py-0.5 rounded-full capitalize">
+            <span className="text-[9px] bg-slate-50 text-slate-500 border border-slate-200/70 px-1.5 py-0.5 rounded-full capitalize">
               {product.shape}
             </span>
           )}
           {product.color && product.clarity && (
-            <span className="text-[9px] bg-stone-50 text-stone-500 border border-stone-200/70 px-1.5 py-0.5 rounded-full">
+            <span className="text-[9px] bg-slate-50 text-slate-500 border border-slate-200/70 px-1.5 py-0.5 rounded-full">
               {product.color}/{product.clarity}
             </span>
           )}
@@ -463,7 +456,7 @@ function GemCard({
           <span
             className="text-sm font-bold tracking-tight"
             style={{
-              background: "linear-gradient(135deg, #d4a853, #9a6424)",
+              background: "linear-gradient(135deg, #3b82f6, #1d4ed8)",
               WebkitBackgroundClip: "text",
               WebkitTextFillColor: "transparent",
             }}
@@ -487,29 +480,32 @@ function GemCard({
 ───────────────────────────────────────────── */
 function ComparisonView({ data }: { data: ComparisonData }) {
   return (
-    <div className="mt-3 rounded-2xl overflow-hidden border border-amber-100 text-xs bg-white">
+    <div className="mt-3 rounded-2xl overflow-hidden border border-blue-100 text-xs bg-white">
       <div
-        className="grid grid-cols-3 text-[9px] uppercase tracking-wider font-bold text-stone-400 border-b border-stone-100"
-        style={{ background: "linear-gradient(135deg, #fafaf8, #fffdf5)" }}
+        className="grid grid-cols-3 text-[9px] uppercase tracking-wider font-bold text-slate-400 border-b border-slate-100"
+        style={{ background: "linear-gradient(135deg, #fafafa, #eff6ff)" }}
       >
-        <div className="p-2.5 border-r border-stone-100" />
-        <div className="p-2.5 border-r border-stone-100 text-center text-amber-700 truncate">{data.productA.name}</div>
-        <div className="p-2.5 text-center text-amber-700 truncate">{data.productB.name}</div>
+        <div className="p-2.5 border-r border-slate-100" />
+        <div className="p-2.5 border-r border-slate-100 text-center text-blue-700 truncate">{data.productA.name}</div>
+        <div className="p-2.5 text-center text-blue-700 truncate">{data.productB.name}</div>
       </div>
       {data.table.map((row, i) => (
-        <div key={i} className="grid grid-cols-3 border-t border-stone-100 hover:bg-amber-50/20 transition-colors">
-          <div className="p-2 text-stone-400 border-r border-stone-100 text-[10px] font-medium">{row.attribute}</div>
-          <div className={`p-2 text-center border-r border-stone-100 font-semibold ${row.winner === "A" ? "text-amber-700" : "text-stone-400"}`}>
+        <div key={i} className="grid grid-cols-3 border-t border-slate-100 hover:bg-blue-50/20 transition-colors">
+          <div className="p-2 text-slate-400 border-r border-slate-100 text-[10px] font-medium">{row.attribute}</div>
+          <div className={`p-2 text-center border-r border-slate-100 font-semibold ${row.winner === "A" ? "text-blue-700" : "text-slate-400"}`}>
             {String(row.valueA)}
           </div>
-          <div className={`p-2 text-center font-semibold ${row.winner === "B" ? "text-amber-700" : "text-stone-400"}`}>
+          <div className={`p-2 text-center font-semibold ${row.winner === "B" ? "text-blue-700" : "text-slate-400"}`}>
             {String(row.valueB)}
           </div>
         </div>
       ))}
       <div
-        className="p-3 border-t border-amber-100 text-[11px] leading-relaxed text-amber-800/70 italic"
-        style={{ background: "linear-gradient(135deg, #fffdf5, #fef9ee)", fontFamily: "'Georgia', serif" }}
+        className="p-3 border-t border-blue-100 text-[11px] leading-relaxed text-blue-800/70 italic"
+        style={{
+          background: "linear-gradient(135deg, #f0f7ff, #eff6ff)",
+          fontFamily: "'DM Serif Display', Georgia, serif",
+        }}
       >
         {data.reasoning}
       </div>
@@ -535,7 +531,7 @@ function MessageBubble({
     return (
       <div className="flex items-start gap-2.5">
         <AvatarIcon />
-        <div className="rounded-2xl rounded-tl-sm px-4 py-3 border border-stone-200 bg-white">
+        <div className="rounded-2xl rounded-tl-sm px-4 py-3 border border-slate-200 bg-white">
           <ThinkingDots />
         </div>
       </div>
@@ -547,7 +543,7 @@ function MessageBubble({
       <div className="flex justify-end">
         <div
           className="max-w-[80%] text-white rounded-2xl rounded-tr-sm px-4 py-2.5 text-sm leading-relaxed"
-          style={{ background: "linear-gradient(135deg, #1c1c1c 0%, #2a2a2a 100%)" }}
+          style={{ background: "linear-gradient(135deg, #1d4ed8 0%, #1e40af 100%)" }}
         >
           {msg.content}
         </div>
@@ -576,13 +572,12 @@ function MessageBubble({
     <div className="flex items-start gap-2.5">
       <AvatarIcon />
       <div className="flex-1 min-w-0">
-        {/* AI text bubble */}
         <div
           className="rounded-2xl rounded-tl-sm px-4 py-3 text-sm border"
           style={{
-            background: "linear-gradient(135deg, #ffffff 0%, #fffdf8 100%)",
-            borderColor: "rgba(212,168,83,0.15)",
-            fontFamily: "'Georgia', serif",
+            background: "linear-gradient(135deg, #ffffff 0%, #f8fbff 100%)",
+            borderColor: "rgba(59,130,246,0.15)",
+            fontFamily: "'DM Serif Display', Georgia, serif",
           }}
         >
           <ReactMarkdown remarkPlugins={[remarkGfm]} components={markdownComponents}>
@@ -590,10 +585,9 @@ function MessageBubble({
           </ReactMarkdown>
         </div>
 
-        {/* Top-level categories */}
         {hasCategories && (
           <>
-            <p className="text-[9px] text-stone-400 uppercase tracking-[0.14em] font-semibold mt-3 mb-1 px-0.5">
+            <p className="text-[9px] text-slate-400 uppercase tracking-[0.14em] font-semibold mt-3 mb-1 px-0.5">
               Categories
             </p>
             <ScrollCarousel count={msg.categories!.length}>
@@ -609,10 +603,9 @@ function MessageBubble({
           </>
         )}
 
-        {/* Subcategories */}
         {hasSubcategories && (
           <>
-            <p className="text-[9px] text-stone-400 uppercase tracking-[0.14em] font-semibold mt-3 mb-1 px-0.5">
+            <p className="text-[9px] text-slate-400 uppercase tracking-[0.14em] font-semibold mt-3 mb-1 px-0.5">
               {msg.subcategories![0]?.parentName
                 ? `${msg.subcategories![0].parentName} › Subcategories`
                 : "Subcategories"}
@@ -627,13 +620,12 @@ function MessageBubble({
                 />
               ))}
             </ScrollCarousel>
-            <p className="text-[9px] text-stone-400 text-center mt-1.5 tracking-wide">
-              Tap <span className="text-amber-600">Browse</span> to open the page · <span className="text-stone-500">Explore</span> to ask Victoria
+            <p className="text-[9px] text-slate-400 text-center mt-1.5 tracking-wide">
+              Tap <span className="text-blue-600">Browse</span> to open · <span className="text-slate-500">Explore</span> to ask Victoria
             </p>
           </>
         )}
 
-        {/* Products */}
         {hasProducts && (
           <>
             <ScrollCarousel count={msg.products!.length}>
@@ -641,13 +633,12 @@ function MessageBubble({
                 <GemCard key={p._id} product={p} onNavigate={onNavigateProduct} />
               ))}
             </ScrollCarousel>
-            <p className="text-[9px] text-stone-400 text-center mt-1.5 tracking-wide">
+            <p className="text-[9px] text-slate-400 text-center mt-1.5 tracking-wide">
               Tap any card to view full details
             </p>
           </>
         )}
 
-        {/* Comparison table */}
         {msg.comparison && <ComparisonView data={msg.comparison} />}
       </div>
     </div>
@@ -655,13 +646,13 @@ function MessageBubble({
 }
 
 /* ─────────────────────────────────────────────
-   Avatar
+   Avatar — blue gradient
 ───────────────────────────────────────────── */
 function AvatarIcon() {
   return (
     <div
       className="w-7 h-7 rounded-full flex items-center justify-center text-white text-xs flex-shrink-0 mt-0.5"
-      style={{ background: "linear-gradient(135deg, #d4a853 0%, #9a6424 100%)" }}
+      style={{ background: "linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%)" }}
     >
       <Sparkles size={12} />
     </div>
@@ -680,7 +671,7 @@ function SuggestedQuestions({
 }) {
   return (
     <div className="space-y-1.5">
-      <p className="text-[9px] text-stone-400 uppercase tracking-[0.15em] font-semibold px-0.5">
+      <p className="text-[9px] text-slate-400 uppercase tracking-[0.15em] font-semibold px-0.5">
         Try asking
       </p>
       {SUGGESTED.map((q, i) => (
@@ -691,14 +682,14 @@ function SuggestedQuestions({
           transition={{ delay: 0.04 + i * 0.04 }}
           onClick={() => onSelect(q)}
           disabled={isLoading}
-          className="flex items-center gap-2.5 w-full text-left text-xs text-stone-500 bg-white/80 rounded-xl px-3 py-2 hover:bg-amber-50 hover:text-amber-800 transition-all group disabled:opacity-40 disabled:cursor-not-allowed"
-          style={{ border: "1px solid rgba(212,168,83,0.12)" }}
+          className="flex items-center gap-2.5 w-full text-left text-xs text-slate-500 bg-white/80 rounded-xl px-3 py-2 hover:bg-blue-50 hover:text-blue-800 transition-all group disabled:opacity-40 disabled:cursor-not-allowed"
+          style={{ border: "1px solid rgba(59,130,246,0.12)" }}
         >
           <span
             className="w-1 h-1 rounded-full flex-shrink-0 opacity-60 group-hover:opacity-100 transition-opacity"
-            style={{ background: "#d4a853" }}
+            style={{ background: "#3b82f6" }}
           />
-          <span style={{ fontFamily: "'Georgia', serif" }}>{q}</span>
+          <span style={{ fontFamily: "'DM Serif Display', Georgia, serif" }}>{q}</span>
         </motion.button>
       ))}
     </div>
@@ -706,24 +697,167 @@ function SuggestedQuestions({
 }
 
 /* ─────────────────────────────────────────────
-   FAB pulse ring
+   FAB Orbital rings — blue theme
 ───────────────────────────────────────────── */
-function PulseRing() {
+function OrbitalRings() {
   return (
     <>
-      <motion.span
-        className="absolute inset-0 rounded-full"
-        style={{ background: "rgba(212,168,83,0.3)" }}
-        animate={{ scale: [1, 1.6], opacity: [0.5, 0] }}
-        transition={{ duration: 2, repeat: Infinity, ease: "easeOut" }}
+      {/* Glow halo */}
+      <span
+        className="absolute inset-[-6px] rounded-full pointer-events-none"
+        style={{
+          background: "radial-gradient(circle, rgba(59,130,246,0.2) 0%, transparent 70%)",
+        }}
       />
+      {/* Ring 1 — slow spin with orb */}
       <motion.span
-        className="absolute inset-0 rounded-full"
-        style={{ background: "rgba(212,168,83,0.2)" }}
-        animate={{ scale: [1, 1.9], opacity: [0.4, 0] }}
-        transition={{ duration: 2, repeat: Infinity, ease: "easeOut", delay: 0.4 }}
+        className="absolute inset-[-10px] rounded-full pointer-events-none"
+        style={{
+          border: "1px solid rgba(59,130,246,0.4)",
+          boxShadow: "inset 0 0 8px rgba(59,130,246,0.08)",
+        }}
+        animate={{ rotate: 360 }}
+        transition={{ duration: 8, repeat: Infinity, ease: "linear" }}
+      >
+        <span
+          className="absolute top-0 left-1/2 -translate-x-1/2 -translate-y-1/2 w-1.5 h-1.5 rounded-full"
+          style={{ background: "linear-gradient(135deg, #93c5fd, #3b82f6)" }}
+        />
+      </motion.span>
+      {/* Ring 2 — counter-spin dashed */}
+      <motion.span
+        className="absolute inset-[-18px] rounded-full pointer-events-none"
+        style={{ border: "1px dashed rgba(147,197,253,0.25)" }}
+        animate={{ rotate: -360 }}
+        transition={{ duration: 14, repeat: Infinity, ease: "linear" }}
+      >
+        <span
+          className="absolute bottom-0 right-1/4 w-1 h-1 rounded-full"
+          style={{ background: "rgba(96,165,250,0.55)" }}
+        />
+      </motion.span>
+      {/* Ripple pulse 1 */}
+      <motion.span
+        className="absolute inset-0 rounded-full pointer-events-none"
+        style={{ background: "rgba(59,130,246,0.15)" }}
+        animate={{ scale: [1, 1.9], opacity: [0.55, 0] }}
+        transition={{ duration: 2.4, repeat: Infinity, ease: "easeOut" }}
+      />
+      {/* Ripple pulse 2 */}
+      <motion.span
+        className="absolute inset-0 rounded-full pointer-events-none"
+        style={{ background: "rgba(59,130,246,0.1)" }}
+        animate={{ scale: [1, 2.3], opacity: [0.4, 0] }}
+        transition={{ duration: 2.4, repeat: Infinity, ease: "easeOut", delay: 0.55 }}
       />
     </>
+  );
+}
+
+/* ─────────────────────────────────────────────
+   Diamond SVG icon
+───────────────────────────────────────────── */
+function GemFacetIcon({ size = 20 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" aria-hidden="true">
+      <path d="M12 2L7 8H17L12 2Z" fill="rgba(255,255,255,0.95)" />
+      <path d="M7 8L2 8L6 14L12 8H7Z" fill="rgba(255,255,255,0.7)" />
+      <path d="M17 8H22L18 14L12 8H17Z" fill="rgba(255,255,255,0.82)" />
+      <path d="M6 14L12 22L12 14H6Z" fill="rgba(255,255,255,0.6)" />
+      <path d="M18 14L12 22L12 14H18Z" fill="rgba(255,255,255,0.75)" />
+      <path d="M12 14H6L12 22L18 14H12Z" fill="rgba(255,255,255,0.55)" />
+      <path d="M7 8L12 8L12 14L6 14Z" fill="rgba(255,255,255,0.12)" />
+    </svg>
+  );
+}
+
+/* ─────────────────────────────────────────────
+   FAB Tooltip — dark slate, blue accents
+───────────────────────────────────────────── */
+function FabTooltip() {
+  return (
+    <motion.div
+      initial={{ opacity: 0, x: 16, scale: 0.92 }}
+      animate={{ opacity: 1, x: 0, scale: 1 }}
+      exit={{ opacity: 0, x: 12, scale: 0.92 }}
+      transition={{ delay: 2, duration: 0.4, ease: [0.16, 1, 0.3, 1] }}
+      className="absolute right-[72px] top-1/2 -translate-y-1/2 pointer-events-none"
+    >
+      <div className="relative flex flex-col items-end">
+        {/* Pill */}
+        <div
+          className="flex items-center gap-2 whitespace-nowrap px-3.5 py-2 rounded-2xl"
+          style={{
+            background: "linear-gradient(135deg, #0f172a 0%, #1e293b 100%)",
+            border: "1px solid rgba(59,130,246,0.28)",
+            boxShadow: "0 8px 32px rgba(0,0,0,0.28), 0 0 0 1px rgba(59,130,246,0.07), inset 0 1px 0 rgba(255,255,255,0.05)",
+          }}
+        >
+          {/* Animated dots */}
+          <div className="flex gap-[3px] items-center">
+            {[0, 1, 2].map((i) => (
+              <motion.span
+                key={i}
+                className="w-[3px] h-[3px] rounded-full"
+                style={{ background: "#60a5fa" }}
+                animate={{ opacity: [0.3, 1, 0.3], scaleY: [0.6, 1.4, 0.6] }}
+                transition={{ duration: 1.2, repeat: Infinity, delay: i * 0.18, ease: "easeInOut" }}
+              />
+            ))}
+          </div>
+
+          {/* Label */}
+          <span
+            className="text-[11px] font-semibold tracking-wide"
+            style={{
+              background: "linear-gradient(90deg, #e0f2fe, #93c5fd, #60a5fa)",
+              WebkitBackgroundClip: "text",
+              WebkitTextFillColor: "transparent",
+              fontFamily: "'DM Serif Display', Georgia, serif",
+            }}
+          >
+            Ask Victoria
+          </span>
+
+          {/* AI badge */}
+          <span
+            className="text-[9px] font-bold px-1.5 py-0.5 rounded-full tracking-widest"
+            style={{
+              background: "rgba(59,130,246,0.14)",
+              color: "rgba(147,197,253,0.85)",
+              border: "1px solid rgba(59,130,246,0.22)",
+              letterSpacing: "0.12em",
+            }}
+          >
+            AI
+          </span>
+        </div>
+
+        {/* Caret */}
+        <div
+          className="absolute right-[-6px] top-1/2 -translate-y-1/2 w-0 h-0"
+          style={{
+            borderTop: "5px solid transparent",
+            borderBottom: "5px solid transparent",
+            borderLeft: "6px solid rgba(59,130,246,0.28)",
+          }}
+        />
+      </div>
+    </motion.div>
+  );
+}
+
+/* ─────────────────────────────────────────────
+   Live badge dot (green on blue)
+───────────────────────────────────────────── */
+function LiveBadgeDot({ borderColor = "#1d4ed8" }: { borderColor?: string }) {
+  return (
+    <motion.div
+      className="absolute -bottom-0.5 -right-0.5 w-2 h-2 bg-emerald-400 rounded-full"
+      style={{ border: `1.5px solid ${borderColor}` }}
+      animate={{ boxShadow: ["0 0 0 0px rgba(52,211,153,0.4)", "0 0 0 4px rgba(52,211,153,0)"] }}
+      transition={{ duration: 2, repeat: Infinity, ease: "easeOut" }}
+    />
   );
 }
 
@@ -765,24 +899,12 @@ export default function GemConsultant() {
     [router]
   );
 
-  /**
-   * Unified category navigation handler.
-   *
-   * - Top-level category  → /category/:slug
-   * - Subcategory         → /products?category=:parentSlug&subcategory=:slug
-   *
-   * Subcategories are identified by the presence of `parentId`.
-   * The parent slug is resolved via `parentSlug` (preferred, set by API) or
-   * falls back to `parentId` if the API already returns it as a slug string.
-   */
   const handleNavigateToCategory = useCallback(
     (category: CategoryCard) => {
       if (category.parentId) {
-        // It's a subcategory — build query-param URL
         const parentSlug = category.parentSlug ?? category.parentId;
         router.push(`/products?category=${parentSlug}&subcategory=${category.slug}`);
       } else {
-        // Top-level category
         router.push(`/category/${category.slug}`);
       }
       setIsOpen(false);
@@ -790,9 +912,6 @@ export default function GemConsultant() {
     [router]
   );
 
-  /**
-   * When user clicks "Explore" on a category tile, Victoria asks about that category.
-   */
   const handleAskAboutCategory = useCallback(
     (name: string) => {
       sendMessage(`Show me ${name}`);
@@ -941,61 +1060,74 @@ export default function GemConsultant() {
   return (
     <>
       {/* ── FAB ── */}
-      <div className="fixed bottom-5 right-5 z-[9998]">
+      <div className="fixed bottom-5 right-5 z-[9998]" style={{ isolation: "isolate" }}>
+
+        {/* Tooltip */}
+        <AnimatePresence>
+          {!isOpen && <FabTooltip />}
+        </AnimatePresence>
+
+        {/* FAB button */}
         <motion.button
           onClick={() => setIsOpen((v) => !v)}
-          className="relative w-14 h-14 rounded-full flex items-center justify-center text-white"
+          className="relative w-14 h-14 rounded-full flex items-center justify-center"
           style={{
             background: isOpen
-              ? "linear-gradient(135deg, #1a1a1a, #2d2d2d)"
-              : "linear-gradient(135deg, #d4a853 0%, #9a6424 100%)",
-            boxShadow: "0 8px 32px rgba(180,120,40,0.35), 0 2px 8px rgba(0,0,0,0.15)",
+              ? "linear-gradient(135deg, #1e3a8a 0%, #1e40af 100%)"
+              : "linear-gradient(150deg, #1d4ed8 0%, #1e40af 100%)",
+            boxShadow: isOpen
+              ? "0 4px 20px rgba(29,78,216,0.35), inset 0 1px 0 rgba(255,255,255,0.08)"
+              : "0 12px 40px rgba(29,78,216,0.45), 0 4px 12px rgba(0,0,0,0.2), inset 0 1px 0 rgba(255,255,255,0.15)",
+            border: "1px solid rgba(147,197,253,0.25)",
           }}
-          whileHover={{ scale: 1.08 }}
-          whileTap={{ scale: 0.94 }}
+          whileHover={{ scale: 1.07 }}
+          whileTap={{ scale: 0.93 }}
           aria-label="Open Gem Consultant"
         >
-          {!isOpen && <PulseRing />}
+          {/* Orbital rings — only when closed */}
+          {!isOpen && <OrbitalRings />}
+
+          {/* Conic shimmer rim */}
+          {!isOpen && (
+            <span
+              className="absolute inset-0 rounded-full pointer-events-none"
+              style={{
+                background:
+                  "conic-gradient(from 0deg, rgba(147,197,253,0.45) 0deg, transparent 60deg, transparent 180deg, rgba(96,165,250,0.3) 240deg, transparent 300deg)",
+              }}
+            />
+          )}
+
+          {/* Live dot */}
+          <LiveBadgeDot borderColor={isOpen ? "#1e40af" : "#1d4ed8"} />
+
+          {/* Icon */}
           <AnimatePresence mode="wait">
             {isOpen ? (
               <motion.span
                 key="close"
-                initial={{ rotate: -90, opacity: 0 }}
-                animate={{ rotate: 0, opacity: 1 }}
-                exit={{ rotate: 90, opacity: 0 }}
-                transition={{ duration: 0.2 }}
+                className="relative z-10 text-blue-200"
+                initial={{ rotate: -90, opacity: 0, scale: 0.5 }}
+                animate={{ rotate: 0, opacity: 1, scale: 1 }}
+                exit={{ rotate: 90, opacity: 0, scale: 0.5 }}
+                transition={{ duration: 0.25, ease: [0.16, 1, 0.3, 1] }}
               >
-                <X size={20} />
+                <X size={18} strokeWidth={1.5} />
               </motion.span>
             ) : (
               <motion.span
                 key="gem"
-                initial={{ rotate: 90, opacity: 0 }}
-                animate={{ rotate: 0, opacity: 1 }}
-                exit={{ rotate: -90, opacity: 0 }}
-                transition={{ duration: 0.2 }}
-                className="flex flex-col items-center"
+                className="relative z-10"
+                initial={{ rotate: 30, opacity: 0, scale: 0.6 }}
+                animate={{ rotate: 0, opacity: 1, scale: 1 }}
+                exit={{ rotate: -30, opacity: 0, scale: 0.6 }}
+                transition={{ duration: 0.3, ease: [0.16, 1, 0.3, 1] }}
               >
-                <Sparkles size={18} />
+                <GemFacetIcon size={22} />
               </motion.span>
             )}
           </AnimatePresence>
         </motion.button>
-
-        <AnimatePresence>
-          {!isOpen && (
-            <motion.div
-              initial={{ opacity: 0, x: 10 }}
-              animate={{ opacity: 1, x: 0 }}
-              exit={{ opacity: 0, x: 10 }}
-              transition={{ delay: 1.5, duration: 0.3 }}
-              className="absolute right-16 top-1/2 -translate-y-1/2 whitespace-nowrap bg-white border border-stone-200 text-stone-700 text-xs font-medium px-3 py-1.5 rounded-full pointer-events-none"
-              style={{ boxShadow: "0 4px 16px rgba(0,0,0,0.08)" }}
-            >
-              ✦ Ask Victoria
-            </motion.div>
-          )}
-        </AnimatePresence>
       </div>
 
       {/* ── Chat Panel ── */}
@@ -1009,17 +1141,17 @@ export default function GemConsultant() {
             transition={{ type: "spring", stiffness: 360, damping: 32 }}
             className={panelClass}
             style={{
-              background: "#f9f8f5",
-              boxShadow: "0 32px 80px rgba(0,0,0,0.18), 0 4px 16px rgba(0,0,0,0.08)",
-              border: "1px solid rgba(212,168,83,0.18)",
+              background: "#f8faff",
+              boxShadow: "0 32px 80px rgba(29,78,216,0.12), 0 4px 16px rgba(0,0,0,0.07)",
+              border: "1px solid rgba(59,130,246,0.18)",
             }}
           >
-            {/* Header */}
+            {/* ── Header ── */}
             <div
               className="flex items-center justify-between px-4 py-3 flex-shrink-0 border-b"
               style={{
-                background: "linear-gradient(135deg, #ffffff 0%, #fffef8 100%)",
-                borderColor: "rgba(212,168,83,0.12)",
+                background: "linear-gradient(135deg, #ffffff 0%, #f0f7ff 100%)",
+                borderColor: "rgba(59,130,246,0.12)",
               }}
             >
               <div className="flex items-center gap-2.5">
@@ -1028,7 +1160,7 @@ export default function GemConsultant() {
                     initial={{ opacity: 0, x: -6 }}
                     animate={{ opacity: 1, x: 0 }}
                     onClick={() => { setMessages([]); setShowSuggestions(false); }}
-                    className="p-1.5 rounded-lg text-stone-300 hover:text-amber-500 hover:bg-amber-50/60 transition-colors"
+                    className="p-1.5 rounded-lg text-slate-300 hover:text-blue-500 hover:bg-blue-50/60 transition-colors"
                     title="New conversation"
                   >
                     <ArrowLeft size={14} />
@@ -1037,48 +1169,62 @@ export default function GemConsultant() {
                 <div className="relative">
                   <div
                     className="w-8 h-8 rounded-xl flex items-center justify-center text-white"
-                    style={{ background: "linear-gradient(135deg, #d4a853 0%, #9a6424 100%)" }}
+                    style={{ background: "linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%)" }}
                   >
                     <Sparkles size={13} />
                   </div>
-                  <div className="absolute -bottom-0.5 -right-0.5 w-2 h-2 bg-emerald-400 rounded-full border-[1.5px] border-white" />
+                  <LiveBadgeDot borderColor="white" />
                 </div>
                 <div>
-                  <p className="text-sm font-semibold text-stone-800 leading-none" style={{ fontFamily: "'Georgia', serif" }}>
+                  <p
+                    className="text-sm font-semibold text-slate-800 leading-none"
+                    style={{ fontFamily: "'DM Serif Display', Georgia, serif" }}
+                  >
                     Victoria
                   </p>
-                  <p className="text-[9px] text-amber-600/70 uppercase tracking-[0.14em] mt-0.5 font-medium">
+                  <p className="text-[9px] text-blue-500/80 uppercase tracking-[0.14em] mt-0.5 font-medium">
                     AI Gem Consultant
                   </p>
                 </div>
               </div>
 
               <div className="flex items-center gap-1.5">
+                {/* Model badge */}
                 <div
                   className="hidden sm:flex items-center gap-1 text-[9px] font-semibold px-2 py-1 rounded-full"
-                  style={{ background: "rgba(212,168,83,0.08)", color: "#9a6424", border: "1px solid rgba(212,168,83,0.2)" }}
+                  style={{
+                    background: "rgba(59,130,246,0.08)",
+                    color: "#1d4ed8",
+                    border: "1px solid rgba(59,130,246,0.2)",
+                  }}
                 >
-                  <span className="w-1 h-1 rounded-full bg-amber-400 animate-pulse" />
+                  <motion.span
+                    className="w-1 h-1 rounded-full bg-blue-400"
+                    animate={{ opacity: [1, 0.4, 1] }}
+                    transition={{ duration: 1.5, repeat: Infinity }}
+                  />
                   GPT-4o
                 </div>
                 <button
                   onClick={() => setIsFullscreen((v) => !v)}
-                  className="p-1.5 rounded-lg text-stone-300 hover:text-stone-600 hover:bg-stone-100 transition-colors"
+                  className="p-1.5 rounded-lg text-slate-300 hover:text-slate-600 hover:bg-slate-100 transition-colors"
                 >
                   {isFullscreen ? <Minimize2 size={13} /> : <Maximize2 size={13} />}
                 </button>
                 <button
                   onClick={() => setIsOpen(false)}
-                  className="p-1.5 rounded-lg text-stone-300 hover:text-stone-600 hover:bg-stone-100 transition-colors"
+                  className="p-1.5 rounded-lg text-slate-300 hover:text-slate-600 hover:bg-slate-100 transition-colors"
                 >
                   <X size={13} />
                 </button>
               </div>
             </div>
 
-            {/* Messages */}
-            <div className="flex-1 overflow-y-auto px-4 py-4 space-y-4" style={{ background: "#f4f3f0" }}>
-
+            {/* ── Messages ── */}
+            <div
+              className="flex-1 overflow-y-auto px-4 py-4 space-y-4"
+              style={{ background: "#eef3fc" }}
+            >
               {/* Welcome screen */}
               {!hasMessages && (
                 <motion.div
@@ -1089,20 +1235,26 @@ export default function GemConsultant() {
                 >
                   <div
                     className="rounded-2xl p-4"
-                    style={{ background: "linear-gradient(135deg, #fff 0%, #fffef5 100%)", border: "1px solid rgba(212,168,83,0.15)" }}
+                    style={{
+                      background: "linear-gradient(135deg, #fff 0%, #f0f7ff 100%)",
+                      border: "1px solid rgba(59,130,246,0.15)",
+                    }}
                   >
                     <div className="flex items-start gap-3 mb-3">
                       <div
                         className="w-8 h-8 rounded-xl flex items-center justify-center text-white flex-shrink-0"
-                        style={{ background: "linear-gradient(135deg, #d4a853, #9a6424)" }}
+                        style={{ background: "linear-gradient(135deg, #3b82f6, #1d4ed8)" }}
                       >
                         <Sparkles size={13} />
                       </div>
                       <div>
-                        <p className="text-[9px] font-bold text-amber-700 uppercase tracking-[0.14em] mb-1.5">
+                        <p className="text-[9px] font-bold text-blue-600 uppercase tracking-[0.14em] mb-1.5">
                           Victoria · AI Gem Consultant
                         </p>
-                        <p className="text-sm text-stone-600 leading-relaxed" style={{ fontFamily: "'Georgia', serif" }}>
+                        <p
+                          className="text-sm text-slate-600 leading-relaxed"
+                          style={{ fontFamily: "'DM Serif Display', Georgia, serif" }}
+                        >
                           Good day. I&apos;m Victoria — your personal gemologist at GMStone.
                           Whether you seek the perfect engagement diamond, a rare coloured stone, or
                           expert guidance on value, I&apos;m at your service.
@@ -1112,12 +1264,18 @@ export default function GemConsultant() {
                     <div className="ml-11 flex items-center gap-1.5">
                       <div className="flex -space-x-1">
                         {["💎", "💍", "✨"].map((e, i) => (
-                          <span key={i} className="w-5 h-5 rounded-full bg-amber-50 border border-amber-100 flex items-center justify-center text-[9px]">
+                          <span
+                            key={i}
+                            className="w-5 h-5 rounded-full bg-blue-50 border border-blue-100 flex items-center justify-center text-[9px]"
+                          >
                             {e}
                           </span>
                         ))}
                       </div>
-                      <p className="text-[10px] text-stone-400 italic" style={{ fontFamily: "'Georgia', serif" }}>
+                      <p
+                        className="text-[10px] text-slate-400 italic"
+                        style={{ fontFamily: "'DM Serif Display', Georgia, serif" }}
+                      >
                         Every recommendation drawn from live inventory
                       </p>
                     </div>
@@ -1126,7 +1284,7 @@ export default function GemConsultant() {
                 </motion.div>
               )}
 
-              {/* Conversation */}
+              {/* Conversation messages */}
               {messages.map((msg, i) => (
                 <motion.div
                   key={msg.id}
@@ -1149,13 +1307,13 @@ export default function GemConsultant() {
                   initial={{ opacity: 0 }}
                   animate={{ opacity: 1 }}
                   onClick={() => setShowSuggestions(true)}
-                  className="text-[9px] text-stone-400 hover:text-amber-600 block mx-auto transition-colors tracking-wide"
+                  className="text-[9px] text-slate-400 hover:text-blue-500 block mx-auto transition-colors tracking-wide"
                 >
-                  ✦ show suggestions
+                  ◆ show suggestions
                 </motion.button>
               )}
 
-              {/* Inline suggestions */}
+              {/* Inline suggestions panel */}
               <AnimatePresence>
                 {showSuggestions && hasMessages && (
                   <motion.div
@@ -1166,8 +1324,13 @@ export default function GemConsultant() {
                   >
                     <div className="pt-1 pb-2">
                       <div className="flex items-center justify-between mb-2">
-                        <p className="text-[9px] text-stone-400 uppercase tracking-[0.15em] font-semibold">Suggestions</p>
-                        <button onClick={() => setShowSuggestions(false)} className="text-stone-300 hover:text-stone-500 transition-colors">
+                        <p className="text-[9px] text-slate-400 uppercase tracking-[0.15em] font-semibold">
+                          Suggestions
+                        </p>
+                        <button
+                          onClick={() => setShowSuggestions(false)}
+                          className="text-slate-300 hover:text-slate-500 transition-colors"
+                        >
                           <X size={10} />
                         </button>
                       </div>
@@ -1183,14 +1346,14 @@ export default function GemConsultant() {
               <div ref={messagesEndRef} />
             </div>
 
-            {/* Input */}
+            {/* ── Input ── */}
             <div
               className="px-3 pb-3 pt-2 flex-shrink-0 border-t"
-              style={{ background: "#ffffff", borderColor: "rgba(212,168,83,0.1)" }}
+              style={{ background: "#ffffff", borderColor: "rgba(59,130,246,0.1)" }}
             >
               <div
-                className="flex items-end gap-2 rounded-2xl border px-3 py-2 transition-all focus-within:border-amber-200"
-                style={{ background: "#fafaf8", borderColor: "rgba(0,0,0,0.07)" }}
+                className="flex items-end gap-2 rounded-2xl border px-3 py-2 transition-all focus-within:border-blue-300 focus-within:shadow-[0_0_0_3px_rgba(59,130,246,0.08)]"
+                style={{ background: "#f8faff", borderColor: "rgba(59,130,246,0.12)" }}
               >
                 <textarea
                   ref={textareaRef}
@@ -1200,14 +1363,22 @@ export default function GemConsultant() {
                   onKeyDown={handleKeyDown}
                   placeholder="Ask about gemstones, categories, pricing…"
                   disabled={isLoading}
-                  className="flex-1 bg-transparent text-sm text-stone-700 placeholder-stone-300 resize-none outline-none leading-relaxed disabled:opacity-50"
-                  style={{ maxHeight: 120, minHeight: 22, fontFamily: "'Georgia', serif" }}
+                  className="flex-1 bg-transparent text-sm text-slate-700 placeholder-slate-300 resize-none outline-none leading-relaxed disabled:opacity-50"
+                  style={{
+                    maxHeight: 120,
+                    minHeight: 22,
+                    fontFamily: "'DM Serif Display', Georgia, serif",
+                  }}
                 />
                 <div className="flex items-center gap-1 flex-shrink-0 pb-0.5">
                   <motion.button
                     onClick={toggleVoice}
                     whileTap={{ scale: 0.9 }}
-                    className={`p-1.5 rounded-lg transition-colors ${isListening ? "text-amber-500 bg-amber-50" : "text-stone-300 hover:text-stone-500 hover:bg-stone-50"}`}
+                    className={`p-1.5 rounded-lg transition-colors ${
+                      isListening
+                        ? "text-blue-500 bg-blue-50"
+                        : "text-slate-300 hover:text-slate-500 hover:bg-slate-50"
+                    }`}
                   >
                     {isListening ? <MicOff size={14} /> : <Mic size={14} />}
                   </motion.button>
@@ -1215,14 +1386,14 @@ export default function GemConsultant() {
                     onClick={() => sendMessage(input)}
                     disabled={isLoading || !input.trim()}
                     whileTap={{ scale: 0.9 }}
-                    className="p-1.5 rounded-xl text-white disabled:opacity-30 disabled:cursor-not-allowed"
-                    style={{ background: "linear-gradient(135deg, #d4a853, #9a6424)" }}
+                    className="p-1.5 rounded-xl text-white disabled:opacity-30 disabled:cursor-not-allowed transition-opacity"
+                    style={{ background: "linear-gradient(135deg, #3b82f6, #1d4ed8)" }}
                   >
                     <Send size={14} />
                   </motion.button>
                 </div>
               </div>
-              <p className="text-[8px] text-stone-300 text-center mt-1 tracking-wider">
+              <p className="text-[8px] text-slate-300 text-center mt-1 tracking-wider">
                 ↵ send · ⇧↵ new line
               </p>
             </div>

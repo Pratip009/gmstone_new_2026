@@ -29,10 +29,9 @@ export async function uploadBuffer(
         public_id: `${Date.now()}-${filename.replace(/\.[^.]+$/, '')}`,
         overwrite: false,
         resource_type: 'image',
-        transformation: [
-          { width: 800, height: 800, crop: 'limit' },   // cap dimensions
-          { quality: 'auto', fetch_format: 'auto' },    // auto-optimise
-        ],
+        // No transformations at upload time — store the original at full quality.
+        // For hero-slides we need full-resolution images; for other folders the
+        // consumer can apply URL-based transforms via getOptimisedUrl() below.
       },
       (err, result) => {
         if (err || !result) return reject(err ?? new Error('Cloudinary upload failed'));
@@ -41,6 +40,52 @@ export async function uploadBuffer(
     );
     stream.end(buffer);
   });
+}
+
+// ── getOptimisedUrl ──────────────────────────────────────────────────────────
+// Returns a Cloudinary delivery URL with quality/format transformations applied
+// at fetch time (never baked into the stored asset).
+//
+// Usage for hero images:
+//   getOptimisedUrl(slide.desktopImage, { width: 1920, quality: 90 })
+//
+// The input can be either a full https://res.cloudinary.com/… URL or a raw
+// public_id.  We reconstruct it so the transform is injected at the right place.
+export function getOptimisedUrl(
+  src: string,
+  opts: {
+    width?: number;
+    height?: number;
+    quality?: number | 'auto';
+    format?: 'auto' | 'webp' | 'jpg' | 'png';
+    crop?: string;
+  } = {}
+): string {
+  const {
+    width,
+    height,
+    quality = 'auto',
+    format = 'auto',
+    crop = 'limit',
+  } = opts;
+
+  // Build the transformation string
+  const parts: string[] = [];
+  if (width)  parts.push(`w_${width}`);
+  if (height) parts.push(`h_${height}`);
+  if (width || height) parts.push(`c_${crop}`);
+  parts.push(`q_${quality}`);
+  parts.push(`f_${format}`);
+  const transform = parts.join(',');
+
+  // If it's already a Cloudinary URL, inject the transform segment after /upload/
+  if (src.includes('res.cloudinary.com')) {
+    return src.replace('/upload/', `/upload/${transform}/`);
+  }
+
+  // Otherwise treat it as a public_id and build the URL from scratch
+  const cloudName = process.env.CLOUDINARY_CLOUD_NAME ?? process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME;
+  return `https://res.cloudinary.com/${cloudName}/image/upload/${transform}/${src}`;
 }
 
 // ── destroyImage ────────────────────────────────────────────────────────────
