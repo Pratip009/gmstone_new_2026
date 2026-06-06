@@ -5,346 +5,383 @@ const testimonials = [
   {
     id: 1,
     name: "Catherine Whitmore",
-    title: "Private Collector, New York",
+    role: "Private Collector · New York",
     gem: "Burmese Ruby",
-    rating: 5,
-    text: "The 4.2ct Burmese ruby I acquired through Alpha Imports is nothing short of extraordinary. Their gemologists provided certification that matched every facet of the stone's provenance. A truly rare find from a house that understands rarity.",
-    initials: "CW",
-    accent: "#b83232",
-    gemIcon: "◆",
+    gemBg: "rgba(120,30,30,0.55)",
+    gemText: "#ffb5b5",
+    quote:
+      "The 4.2ct Burmese ruby I acquired through Alpha Imports is nothing short of extraordinary. Their gemologists provided certification that matched every facet of the stone's provenance — a truly rare find from a house that understands rarity.",
+    photo: "https://images.unsplash.com/photo-1531123897727-8f129e1688ce?w=1200&q=85&fit=crop",
+    avatar: "https://images.unsplash.com/photo-1531123897727-8f129e1688ce?w=160&q=80&fit=crop&crop=face",
   },
   {
     id: 2,
     name: "James Harrington III",
-    title: "Estate Jeweler, London",
+    role: "Estate Jeweler · London",
     gem: "Kashmir Sapphire",
-    rating: 5,
-    text: "I have sourced stones from dealers across four continents. Alpha Imports consistently delivers what others only promise — transparency, impeccable grading, and stones that stop you mid-breath. Their Kashmir sapphires are beyond compare.",
-    initials: "JH",
-    accent: "#2c5282",
-    gemIcon: "◈",
+    gemBg: "rgba(25,50,110,0.55)",
+    gemText: "#a8c0f5",
+    quote:
+      "I have sourced stones from dealers across four continents. Alpha Imports consistently delivers what others only promise — transparency, impeccable grading, and stones that stop you mid-breath. Their Kashmir sapphires are beyond compare.",
+    photo: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=1200&q=85&fit=crop",
+    avatar: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=160&q=80&fit=crop&crop=face",
   },
   {
     id: 3,
     name: "Mei-Lin Zhao",
-    title: "Luxury Brand Designer, Hong Kong",
+    role: "Haute Joaillerie Designer · Hong Kong",
     gem: "Colombian Emerald",
-    rating: 5,
-    text: "When designing our haute joaillerie collection, only the finest emeralds would suffice. Alpha Imports sourced seven matched Colombian emeralds with identical saturation — something I thought impossible. They made our entire season.",
-    initials: "ML",
-    accent: "#276749",
-    gemIcon: "⬡",
+    gemBg: "rgba(12,55,32,0.55)",
+    gemText: "#7de0aa",
+    quote:
+      "When designing our haute joaillerie collection, only the finest emeralds would suffice. Alpha Imports sourced seven matched Colombian emeralds with identical saturation — something I thought impossible. They made our entire season.",
+    photo: "https://images.unsplash.com/photo-1489424731084-a5d8b219a5bb?w=1200&q=85&fit=crop",
+    avatar: "https://images.unsplash.com/photo-1489424731084-a5d8b219a5bb?w=160&q=80&fit=crop&crop=face",
   },
   {
     id: 4,
     name: "Dominique Arsenault",
-    title: "Auction Specialist, Sotheby's",
+    role: "Auction Specialist · Sotheby's Geneva",
     gem: "Fancy Vivid Diamond",
-    rating: 5,
-    text: "For our Geneva auction we required a 3ct+ Fancy Vivid Yellow — flawless provenance, GIA certified. Alpha Imports delivered within a week. The stone achieved 340% of its reserve. Their network is unparalleled in the trade.",
-    initials: "DA",
-    accent: "#92760a",
-    gemIcon: "✦",
+    gemBg: "rgba(80,56,0,0.55)",
+    gemText: "#f5d97a",
+    quote:
+      "For our Geneva auction we required a 3ct+ Fancy Vivid Yellow — flawless provenance, GIA certified. Alpha Imports delivered within a week. The stone achieved 340% of its reserve. Their network is unparalleled in the trade.",
+    photo: "https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=1200&q=85&fit=crop",
+    avatar: "https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=160&q=80&fit=crop&crop=face",
   },
   {
     id: 5,
     name: "Priya Kapoor-Singh",
-    title: "Bride & Client, Mumbai",
-    gem: "Pink Diamond",
-    rating: 5,
-    text: "My engagement ring features a 1.8ct Argyle pink diamond from Alpha Imports. The team walked me through every aspect — origin, grading, setting possibilities. It is the most beautiful object I have ever owned. Worth every moment.",
-    initials: "PK",
-    accent: "#943d70",
-    gemIcon: "❋",
+    role: "Client & Collector · Mumbai",
+    gem: "Argyle Pink Diamond",
+    gemBg: "rgba(80,22,55,0.55)",
+    gemText: "#f5a8d0",
+    quote:
+      "My engagement ring features a 1.8ct Argyle pink diamond from Alpha Imports. The team walked me through every aspect — origin, grading, setting possibilities. It is the most beautiful object I have ever owned.",
+    photo: "https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=1200&q=85&fit=crop",
+    avatar: "https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=160&q=80&fit=crop&crop=face",
   },
 ];
 
-const AUTOPLAY_INTERVAL = 5500;
+const INTERVAL = 5000;
 
 export default function Testimonials() {
-  const [active, setActive]   = useState(0);
-  const [prev, setPrev]       = useState<number | null>(null);
-  const [direction, setDirection] = useState<"next" | "prev">("next");
-  const [animating, setAnimating] = useState(false);
-  const [paused, setPaused]   = useState(false);
+  const [cur, setCur] = useState(0);
+  const [animKey, setAnimKey] = useState(0);
+  const [paused, setPaused] = useState(false);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const total = testimonials.length;
 
-  const go = useCallback((idx: number, dir: "next" | "prev") => {
-    if (animating) return;
-    setDirection(dir);
-    setPrev(active);
-    setAnimating(true);
-    setTimeout(() => {
-      setActive(idx);
-      setPrev(null);
-      setAnimating(false);
-    }, 480);
-  }, [active, animating]);
+  const goTo = useCallback((idx: number) => {
+    setCur(idx);
+    setAnimKey((k) => k + 1);
+  }, []);
 
-  const next  = useCallback(() => go((active + 1) % total, "next"), [active, go, total]);
-  const goTo  = useCallback((idx: number) => go(idx, idx > active ? "next" : "prev"), [active, go]);
+  const next = useCallback(() => goTo((cur + 1) % total), [cur, goTo, total]);
+  const prev = useCallback(() => goTo((cur - 1 + total) % total), [cur, goTo, total]);
 
+  // Auto-slide: always running unless paused, restarts cleanly when cur/paused changes
   useEffect(() => {
+    if (timerRef.current) clearInterval(timerRef.current);
     if (paused) return;
-    timerRef.current = setInterval(next, AUTOPLAY_INTERVAL);
+    timerRef.current = setInterval(() => {
+      setCur((c) => (c + 1) % total);
+      setAnimKey((k) => k + 1);
+    }, INTERVAL);
     return () => { if (timerRef.current) clearInterval(timerRef.current); };
-  }, [next, paused]);
-
-  const t = testimonials[active];
-  const p = prev !== null ? testimonials[prev] : null;
+  }, [paused, total]);
 
   return (
     <>
       <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=Poppins:ital,wght@0,300;0,400;0,500;0,600;1,300;1,400&family=Cormorant+Garamond:ital,wght@0,400;0,500;1,400;1,500&display=swap');
+        @import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;1,300;1,400;1,500&family=DM+Sans:wght@300;400;500;600&display=swap');
 
         .tr-root {
-          background: #ffffff;
-          position: relative;
+          background: #080f1e;
+          width: 100%;
+          height: 80vh;
+          min-height: 480px;
+          max-height: 900px;
+          font-family: 'DM Sans', sans-serif;
           overflow: hidden;
-          padding: 96px 0 112px;
+          position: relative;
+          display: flex;
+          flex-direction: column;
         }
 
-        /* Very subtle warm texture lines */
         .tr-root::before {
           content: '';
           position: absolute;
           inset: 0;
           background:
-            radial-gradient(ellipse 70% 50% at 50% 0%, rgba(184,146,50,0.06) 0%, transparent 65%),
-            radial-gradient(ellipse 50% 40% at 0% 100%, rgba(184,146,50,0.04) 0%, transparent 60%),
-            radial-gradient(ellipse 50% 40% at 100% 0%, rgba(184,146,50,0.04) 0%, transparent 60%);
+            radial-gradient(ellipse 75% 55% at 18% 0%, rgba(30,55,110,0.50) 0%, transparent 60%),
+            radial-gradient(ellipse 55% 45% at 82% 100%, rgba(18,38,82,0.45) 0%, transparent 60%);
           pointer-events: none;
+          z-index: 0;
         }
 
-        .tr-label {
-          font-family: 'Poppins', sans-serif;
-          font-size: 10px;
-          font-weight: 600;
-          letter-spacing: 0.28em;
-          text-transform: uppercase;
-          color: #b89432;
-          display: flex;
+        .tr-bg-svg {
+          position: absolute;
+          inset: 0;
+          width: 100%;
+          height: 100%;
+          pointer-events: none;
+          opacity: 0.07;
+          z-index: 0;
+        }
+
+        /* ── Header (compact) ── */
+        .tr-header {
+          position: relative;
+          z-index: 2;
+          text-align: center;
+          padding: 28px 24px 20px;
+          flex-shrink: 0;
+        }
+
+        .tr-eyebrow {
+          display: inline-flex;
           align-items: center;
           gap: 12px;
-          justify-content: center;
-          margin-bottom: 14px;
+          font-size: 9px;
+          letter-spacing: 0.34em;
+          text-transform: uppercase;
+          color: #5d84cc;
+          font-weight: 500;
+          margin-bottom: 8px;
         }
-        .tr-label::before, .tr-label::after {
+        .tr-eyebrow::before, .tr-eyebrow::after {
           content: '';
-          width: 36px;
-          height: 1px;
-          background: #c9a84c;
-          opacity: 0.5;
+          display: block;
+          width: 32px; height: 1px;
+          background: linear-gradient(90deg, transparent, #3a5a9a);
         }
+        .tr-eyebrow::after { background: linear-gradient(90deg, #3a5a9a, transparent); }
 
         .tr-heading {
           font-family: 'Cormorant Garamond', serif;
-          font-size: clamp(34px, 4.5vw, 56px);
-          font-weight: 400;
-          color: #1a1612;
-          text-align: center;
-          line-height: 1.1;
-          letter-spacing: -0.01em;
-          margin-bottom: 64px;
+          font-size: clamp(28px, 3.8vw, 48px);
+          font-weight: 300;
+          color: #eef2fb;
+          line-height: 1.06;
+          letter-spacing: -0.015em;
         }
-        .tr-heading em {
-          font-style: italic;
-          color: #b89432;
-        }
+        .tr-heading em { font-style: italic; color: #7aa3e8; font-weight: 400; }
 
-        /* Stage */
+        /* ── Stage fills remaining height ── */
         .tr-stage {
           position: relative;
-          max-width: 820px;
-          margin: 0 auto;
-          padding: 0 24px;
-          min-height: 360px;
+          z-index: 2;
+          flex: 1;
+          min-height: 0;
         }
-        @media(max-width:640px){ .tr-stage{ min-height:440px; } }
 
-        /* Card */
-        .tr-card {
+        .tr-slide { display: none; }
+        .tr-slide.active {
+          display: grid;
+          grid-template-columns: 1fr 1fr;
+          height: 100%;
+          animation: trFadeUp 0.55s cubic-bezier(0.22,1,0.36,1) both;
+        }
+
+        @keyframes trFadeUp {
+          from { opacity: 0; transform: translateY(16px); }
+          to   { opacity: 1; transform: translateY(0); }
+        }
+
+        /* ── Image panel ── */
+        .tr-img-panel {
+          position: relative;
+          overflow: hidden;
+        }
+        .tr-img-panel img {
+          width: 100%; height: 100%;
+          object-fit: cover;
+          display: block;
+          filter: brightness(0.78) saturate(0.8);
+          transition: transform 8s ease;
+        }
+        .tr-slide.active .tr-img-panel img { transform: scale(1.04); }
+
+        .tr-img-overlay-r {
+          position: absolute; inset: 0;
+          background: linear-gradient(100deg, transparent 38%, #080f1e 97%);
+        }
+        .tr-img-overlay-b {
+          position: absolute; inset: 0;
+          background: linear-gradient(to top, rgba(8,15,30,0.65) 0%, transparent 45%);
+        }
+
+        .tr-gem-pill {
           position: absolute;
-          inset: 0;
-          background: #ffffff;
-          border: 1px solid rgba(184,148,50,0.16);
-          border-radius: 3px;
-          padding: 48px 52px;
+          bottom: 20px; left: 20px;
+          font-size: 9px;
+          letter-spacing: 0.22em;
+          text-transform: uppercase;
+          font-weight: 600;
+          padding: 5px 13px;
+          border-radius: 2px;
+          backdrop-filter: blur(10px);
+          -webkit-backdrop-filter: blur(10px);
+        }
+
+        .tr-progress {
+          position: absolute;
+          bottom: 0; left: 0;
+          height: 2px;
+          background: rgba(100,150,240,0.75);
+          width: 0%;
+        }
+        .tr-progress.running {
+          animation: trProg 5s linear forwards;
+        }
+        @keyframes trProg { from{width:0%} to{width:100%} }
+
+        /* ── Text panel ── */
+        .tr-text-panel {
+          padding: 36px 48px 32px 52px;
           display: flex;
           flex-direction: column;
-          gap: 28px;
-          box-shadow: 0 2px 12px rgba(0,0,0,0.05), 0 16px 48px rgba(0,0,0,0.06);
-        }
-        @media(max-width:640px){ .tr-card{ padding:32px 24px; } }
-
-        /* Gold corner ornaments */
-        .tr-card::before {
-          content: '';
-          position: absolute;
-          top: 0; left: 0;
-          width: 52px; height: 52px;
-          border-top: 1px solid rgba(184,148,50,0.45);
-          border-left: 1px solid rgba(184,148,50,0.45);
-        }
-        .tr-card::after {
-          content: '';
-          position: absolute;
-          bottom: 0; right: 0;
-          width: 52px; height: 52px;
-          border-bottom: 1px solid rgba(184,148,50,0.45);
-          border-right: 1px solid rgba(184,148,50,0.45);
+          justify-content: center;
+          gap: 0;
+          overflow: hidden;
         }
 
-        .tr-card-enter-next { animation: trInNext 0.48s cubic-bezier(0.22,1,0.36,1) forwards; }
-        .tr-card-exit-next  { animation: trOutNext 0.48s cubic-bezier(0.22,1,0.36,1) forwards; }
-        .tr-card-enter-prev { animation: trInPrev 0.48s cubic-bezier(0.22,1,0.36,1) forwards; }
-        .tr-card-exit-prev  { animation: trOutPrev 0.48s cubic-bezier(0.22,1,0.36,1) forwards; }
+        .tr-stars {
+          display: flex; gap: 4px;
+          margin-bottom: 14px;
+        }
+        .tr-star {
+          font-size: 13px; color: #5a82cc;
+          animation: trStarPop 0.3s ease backwards;
+        }
+        @keyframes trStarPop {
+          from { transform: scale(0.3); opacity: 0; }
+          to   { transform: scale(1);   opacity: 1; }
+        }
 
-        @keyframes trInNext  { from{opacity:0;transform:translateX(48px) scale(0.98)} to{opacity:1;transform:translateX(0) scale(1)} }
-        @keyframes trOutNext { from{opacity:1;transform:translateX(0) scale(1)} to{opacity:0;transform:translateX(-48px) scale(0.98)} }
-        @keyframes trInPrev  { from{opacity:0;transform:translateX(-48px) scale(0.98)} to{opacity:1;transform:translateX(0) scale(1)} }
-        @keyframes trOutPrev { from{opacity:1;transform:translateX(0) scale(1)} to{opacity:0;transform:translateX(48px) scale(0.98)} }
-
-        .tr-quote-mark {
+        .tr-big-quote {
           font-family: 'Cormorant Garamond', serif;
-          font-size: 88px;
+          font-size: 80px;
           line-height: 0.6;
-          color: rgba(184,148,50,0.12);
-          position: absolute;
-          top: 38px;
-          right: 48px;
+          color: rgba(90,130,210,0.12);
           font-style: italic;
           user-select: none;
-          pointer-events: none;
+          margin-bottom: 6px;
         }
 
-        .tr-gem-badge {
-          display: inline-flex;
-          align-items: center;
-          gap: 7px;
-          padding: 4px 12px 4px 9px;
-          font-family: 'Poppins', sans-serif;
-          font-size: 9.5px;
-          font-weight: 600;
-          letter-spacing: 0.18em;
-          text-transform: uppercase;
-          width: fit-content;
-          border: 1px solid;
-          border-radius: 2px;
-        }
-
-        .tr-stars { display:flex; gap:3px; align-items:center; }
-        .tr-star {
-          color: #c9a030;
-          font-size: 13px;
-          animation: starPop 0.35s ease backwards;
-        }
-        @keyframes starPop {
-          from { transform:scale(0.4); opacity:0; }
-          to   { transform:scale(1);   opacity:1; }
-        }
-
-        .tr-text {
+        .tr-quote {
           font-family: 'Cormorant Garamond', serif;
-          font-size: clamp(17px, 2vw, 21px);
-          font-weight: 400;
+          font-size: clamp(16px, 1.7vw, 20px);
           font-style: italic;
-          color: #4a4038;
-          line-height: 1.78;
-          flex: 1;
+          font-weight: 400;
+          color: #b8cef0;
+          line-height: 1.72;
+          margin-bottom: 24px;
+          display: -webkit-box;
+          -webkit-line-clamp: 5;
+          -webkit-box-orient: vertical;
+          overflow: hidden;
+        }
+
+        .tr-rule {
+          width: 44px; height: 1px;
+          background: rgba(90,130,210,0.28);
+          margin-bottom: 20px;
+          flex-shrink: 0;
         }
 
         .tr-author {
           display: flex;
           align-items: center;
-          gap: 16px;
-          border-top: 1px solid rgba(184,148,50,0.12);
-          padding-top: 22px;
-          margin-top: auto;
-        }
-
-        .tr-avatar {
-          width: 48px; height: 48px;
-          border-radius: 50%;
-          display: flex; align-items: center; justify-content: center;
-          font-family: 'Cormorant Garamond', serif;
-          font-size: 17px; font-weight: 500;
-          color: #fff;
+          gap: 14px;
           flex-shrink: 0;
         }
 
-        .tr-name {
-          font-family: 'Poppins', sans-serif;
+        .tr-avatar {
+          width: 44px; height: 44px;
+          border-radius: 50%;
+          overflow: hidden;
+          border: 1.5px solid rgba(90,130,210,0.30);
+          flex-shrink: 0;
+        }
+        .tr-avatar img {
+          width: 100%; height: 100%;
+          object-fit: cover;
+          filter: grayscale(15%);
+        }
+
+        .tr-author-name {
           font-size: 13px; font-weight: 600;
-          color: #1a1612;
-          letter-spacing: 0.02em;
+          color: #dde8f8; letter-spacing: 0.025em;
+          margin-bottom: 4px;
         }
-        .tr-role {
-          font-family: 'Poppins', sans-serif;
-          font-size: 10px; font-weight: 400;
-          color: #9a8f84;
-          letter-spacing: 0.08em;
-          margin-top: 3px;
-          text-transform: uppercase;
+        .tr-author-role {
+          font-size: 10px; color: #435f96;
+          letter-spacing: 0.12em;
+          text-transform: uppercase; font-weight: 400;
         }
 
-        /* Progress bar */
-        .tr-progress {
-          position: absolute;
-          bottom: 0; left: 0;
-          height: 2px;
-          background: linear-gradient(90deg, #c9a030, #e8c45a);
-          animation: trProgress 5.5s linear forwards;
-          border-radius: 0 1px 1px 0;
-          z-index: 10;
-        }
-        @keyframes trProgress { from{width:0%} to{width:100%} }
-
-        /* Controls */
-        .tr-controls {
+        /* ── Nav (compact) ── */
+        .tr-nav {
+          position: relative; z-index: 2;
           display: flex;
           align-items: center;
           justify-content: center;
-          gap: 20px;
-          margin-top: 48px;
+          gap: 16px;
+          padding: 14px 24px 16px;
+          flex-shrink: 0;
         }
 
         .tr-arrow {
-          width: 44px; height: 44px;
-          border: 1px solid rgba(184,148,50,0.30);
+          width: 36px; height: 36px;
           border-radius: 50%;
-          background: #fff;
-          color: #b89432;
+          border: 1px solid rgba(90,130,210,0.22);
+          background: rgba(255,255,255,0.03);
+          color: #6b9ef0;
           cursor: pointer;
           display: flex; align-items: center; justify-content: center;
-          transition: all 0.22s ease;
-          box-shadow: 0 1px 4px rgba(0,0,0,0.06);
+          transition: border-color 0.22s, background 0.22s;
         }
         .tr-arrow:hover {
-          border-color: rgba(184,148,50,0.70);
-          background: #fdf8ee;
-          box-shadow: 0 2px 12px rgba(184,148,50,0.15);
+          border-color: rgba(90,130,210,0.55);
+          background: rgba(90,130,210,0.10);
         }
 
-        .tr-dots { display:flex; align-items:center; gap:8px; }
+        .tr-dots { display: flex; align-items: center; gap: 8px; }
         .tr-dot {
-          width: 6px; height: 6px;
-          border-radius: 50%;
-          border: 1px solid rgba(184,148,50,0.40);
-          background: transparent;
-          cursor: pointer;
-          transition: all 0.28s ease;
-          padding: 0;
+          height: 5px; border-radius: 3px;
+          border: none; cursor: pointer;
+          transition: all 0.3s cubic-bezier(0.4,0,0.2,1);
+          background: rgba(90,130,210,0.22);
+          width: 5px; padding: 0;
         }
-        .tr-dot.active {
-          background: #c9a030;
-          border-color: #c9a030;
-          width: 22px;
-          border-radius: 3px;
+        .tr-dot.on { background: #6b9ef0; width: 22px; }
+        .tr-dot:hover:not(.on) { background: rgba(90,130,210,0.45); }
+
+        .tr-counter {
+          position: absolute; right: 24px;
+          font-size: 10px; letter-spacing: 0.2em;
+          color: #243558; font-weight: 300;
         }
-        .tr-dot:hover:not(.active) { background: rgba(184,148,50,0.25); }
+        .tr-counter b { color: #6b9ef0; font-weight: 500; }
+
+        /* ── Mobile ── */
+        @media (max-width: 768px) {
+          .tr-root { height: auto; max-height: none; }
+          .tr-slide.active {
+            grid-template-columns: 1fr;
+            height: auto;
+          }
+          .tr-img-panel { height: 240px; }
+          .tr-img-overlay-r {
+            background: linear-gradient(to top, #080f1e 0%, transparent 65%);
+          }
+          .tr-text-panel { padding: 28px 20px 24px; }
+          .tr-big-quote { font-size: 60px; }
+          .tr-quote { -webkit-line-clamp: 6; }
+        }
       `}</style>
 
       <section
@@ -352,122 +389,82 @@ export default function Testimonials() {
         onMouseEnter={() => setPaused(true)}
         onMouseLeave={() => setPaused(false)}
       >
-        {/* Subtle background facet lines */}
-        <svg style={{ position:"absolute", inset:0, width:"100%", height:"100%", pointerEvents:"none", opacity:0.12 }} viewBox="0 0 1440 640" preserveAspectRatio="xMidYMid slice">
-          <polygon points="0,0 380,200 0,400"           fill="none" stroke="#c9a030" strokeWidth="0.6"/>
-          <polygon points="1440,0 1060,200 1440,400"    fill="none" stroke="#c9a030" strokeWidth="0.6"/>
-          <polygon points="720,0 980,300 720,640 460,300" fill="none" stroke="#c9a030" strokeWidth="0.5"/>
-          <line x1="0"    y1="0"   x2="720" y2="320" stroke="#c9a030" strokeWidth="0.4"/>
-          <line x1="1440" y1="0"   x2="720" y2="320" stroke="#c9a030" strokeWidth="0.4"/>
-          <line x1="0"    y1="640" x2="720" y2="320" stroke="#c9a030" strokeWidth="0.4"/>
-          <line x1="1440" y1="640" x2="720" y2="320" stroke="#c9a030" strokeWidth="0.4"/>
+        <svg className="tr-bg-svg" viewBox="0 0 1440 900" preserveAspectRatio="xMidYMid slice" aria-hidden="true">
+          <line x1="0" y1="0" x2="1440" y2="900" stroke="#6b9ef0" strokeWidth="0.8" />
+          <line x1="1440" y1="0" x2="0" y2="900" stroke="#6b9ef0" strokeWidth="0.8" />
+          <line x1="720" y1="0" x2="720" y2="900" stroke="#6b9ef0" strokeWidth="0.5" />
+          <line x1="0" y1="450" x2="1440" y2="450" stroke="#6b9ef0" strokeWidth="0.5" />
+          <circle cx="720" cy="450" r="340" fill="none" stroke="#6b9ef0" strokeWidth="0.5" />
+          <circle cx="720" cy="450" r="200" fill="none" stroke="#6b9ef0" strokeWidth="0.4" />
+          <polygon points="720,100 1140,670 300,670" fill="none" stroke="#6b9ef0" strokeWidth="0.5" />
         </svg>
 
-        <div style={{ maxWidth:1200, margin:"0 auto", padding:"0 24px", position:"relative", zIndex:1 }}>
+        <header className="tr-header">
+          <div className="tr-eyebrow"><span>Client Voices</span></div>
+          <h2 className="tr-heading">Worn with <em>trust</em></h2>
+        </header>
 
-          {/* Header */}
-          <div className="tr-label"><span>✦</span> Client Testimonials <span>✦</span></div>
-          <h2 className="tr-heading">Words of <em>Distinction</em></h2>
-
-          {/* Stage */}
-          <div className="tr-stage">
-            {!paused && <div key={`${active}-p`} className="tr-progress" />}
-
-            {p && animating && (
-              <div className={`tr-card tr-card-exit-${direction}`} style={{ zIndex:1 }}>
-                <CardContent t={p} />
+        <div className="tr-stage">
+          {testimonials.map((item, i) => (
+            <div key={item.id} className={`tr-slide${i === cur ? " active" : ""}`}>
+              <div className="tr-img-panel">
+                <img src={item.photo} alt={item.name} loading="lazy" />
+                <div className="tr-img-overlay-r" />
+                <div className="tr-img-overlay-b" />
+                <div className="tr-gem-pill" style={{ background: item.gemBg, color: item.gemText }}>
+                  {item.gem}
+                </div>
+                <div key={animKey} className={`tr-progress${!paused ? " running" : ""}`} />
               </div>
-            )}
-            <div className={`tr-card ${animating ? `tr-card-enter-${direction}` : ""}`} style={{ zIndex:2 }}>
-              <CardContent t={t} />
+
+              <div className="tr-text-panel">
+                <div className="tr-stars">
+                  {Array.from({ length: 5 }).map((_, si) => (
+                    <span key={si} className="tr-star" style={{ animationDelay: `${si * 0.07}s` }}>★</span>
+                  ))}
+                </div>
+                <div className="tr-big-quote" aria-hidden="true">"</div>
+                <p className="tr-quote">"{item.quote}"</p>
+                <div className="tr-rule" />
+                <div className="tr-author">
+                  <div className="tr-avatar">
+                    <img src={item.avatar} alt={item.name} />
+                  </div>
+                  <div>
+                    <div className="tr-author-name">{item.name}</div>
+                    <div className="tr-author-role">{item.role}</div>
+                  </div>
+                </div>
+              </div>
             </div>
-          </div>
-
-          {/* Controls */}
-          <div className="tr-controls">
-            <button className="tr-arrow" aria-label="Previous"
-              onClick={() => { if (timerRef.current) clearInterval(timerRef.current); go((active - 1 + total) % total, "prev"); }}>
-              <svg width="15" height="15" viewBox="0 0 16 16" fill="none">
-                <path d="M10 3L5 8l5 5" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"/>
-              </svg>
-            </button>
-
-            <div className="tr-dots">
-              {testimonials.map((_, i) => (
-                <button key={i}
-                  className={`tr-dot ${i === active ? "active" : ""}`}
-                  onClick={() => { if (timerRef.current) clearInterval(timerRef.current); goTo(i); }}
-                  aria-label={`Testimonial ${i + 1}`}
-                />
-              ))}
-            </div>
-
-            <button className="tr-arrow" aria-label="Next"
-              onClick={() => { if (timerRef.current) clearInterval(timerRef.current); next(); }}>
-              <svg width="15" height="15" viewBox="0 0 16 16" fill="none">
-                <path d="M6 3l5 5-5 5" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"/>
-              </svg>
-            </button>
-          </div>
-
-          {/* Counter */}
-          <div style={{
-            textAlign:"center", marginTop:20,
-            fontFamily:"'Poppins', sans-serif",
-            fontSize:11, letterSpacing:"0.18em",
-            color:"#c8b890", fontWeight:300,
-          }}>
-            <span style={{ color:"#b89432", fontWeight:500 }}>{String(active+1).padStart(2,"0")}</span>
-            {" / "}
-            {String(total).padStart(2,"0")}
-          </div>
-
-        </div>
-      </section>
-    </>
-  );
-}
-
-function CardContent({ t }: { t: typeof testimonials[0] }) {
-  return (
-    <>
-      <div className="tr-quote-mark" aria-hidden="true">"</div>
-
-      <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", flexWrap:"wrap", gap:10 }}>
-        <div className="tr-gem-badge" style={{
-          color: t.accent,
-          borderColor: `${t.accent}38`,
-          background: `${t.accent}0c`,
-        }}>
-          <span style={{ fontSize:13 }}>{t.gemIcon}</span>
-          {t.gem}
-        </div>
-        <div className="tr-stars">
-          {Array.from({ length: t.rating }).map((_, i) => (
-            <span key={i} className="tr-star" style={{ animationDelay:`${i*0.06}s` }}>★</span>
           ))}
         </div>
-      </div>
 
-      <p className="tr-text">"{t.text}"</p>
+        <div className="tr-nav">
+          <button className="tr-arrow" aria-label="Previous" onClick={prev}>
+            <svg width="13" height="13" viewBox="0 0 16 16" fill="none">
+              <path d="M10 3L5 8l5 5" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+          </button>
 
-      <div className="tr-author">
-        <div className="tr-avatar" style={{ background:`linear-gradient(135deg, ${t.accent}dd, ${t.accent}88)` }}>
-          {t.initials}
+          <div className="tr-dots">
+            {testimonials.map((_, i) => (
+              <button key={i} className={`tr-dot${i === cur ? " on" : ""}`}
+                aria-label={`Go to testimonial ${i + 1}`} onClick={() => goTo(i)} />
+            ))}
+          </div>
+
+          <button className="tr-arrow" aria-label="Next" onClick={next}>
+            <svg width="13" height="13" viewBox="0 0 16 16" fill="none">
+              <path d="M6 3l5 5-5 5" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+          </button>
+
+          <div className="tr-counter">
+            <b>{String(cur + 1).padStart(2, "0")}</b>{" / "}{String(total).padStart(2, "0")}
+          </div>
         </div>
-        <div>
-          <div className="tr-name">{t.name}</div>
-          <div className="tr-role">{t.title}</div>
-        </div>
-        <div style={{
-          marginLeft:"auto",
-          fontFamily:"'Cormorant Garamond', serif",
-          fontSize:26, color:`${t.accent}40`,
-          fontStyle:"italic", lineHeight:1,
-        }}>
-          {t.gemIcon}
-        </div>
-      </div>
+      </section>
     </>
   );
 }

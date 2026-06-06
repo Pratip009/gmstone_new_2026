@@ -22,23 +22,49 @@ interface HeroSlide {
 }
 
 interface HeroCarouselProps {
-  // Server-fetched slides passed from the parent Server Component so the
-  // carousel renders immediately without a client-side fetch + skeleton.
   initialSlides?: HeroSlide[];
 }
 
 const AUTO_ROTATE_MS = 6000;
 
 // ── Cloudinary URL optimiser ─────────────────────────────────────────────────
-// Injects a quality + format transform into an existing Cloudinary URL so we
-// deliver the right resolution without touching the stored original.
-function optimiseCloudinaryUrl(src: string, width: number): string {
+// Only injects quality + format — NO width resize — so the original resolution
+// is preserved. f_auto picks the best format (WebP/AVIF) for the browser.
+function optimiseCloudinaryUrl(src: string): string {
   if (!src) return src;
   if (!src.includes("res.cloudinary.com")) return src;
-  // Insert transform right after /upload/
-  // e.g. .../upload/w_1920,q_90,f_auto/...
-  const transform = `w_${width},q_90,f_auto`;
-  return src.replace("/upload/", `/upload/${transform}/`);
+  // Avoid double-injecting if a transform is already present
+  if (src.includes("/upload/q_")) return src;
+  return src.replace("/upload/", "/upload/q_100,f_auto/");
+}
+
+// ── Typewriter hook ───────────────────────────────────────────────────────────
+function useTypewriter(text: string): string {
+  const [displayed, setDisplayed] = useState("");
+
+  useEffect(() => {
+    setDisplayed("");
+    if (!text) return;
+
+    let intervalId: ReturnType<typeof setInterval> | null = null;
+
+    // 520ms pause after slide transition before typing begins
+    const delayId = setTimeout(() => {
+      let i = 0;
+      intervalId = setInterval(() => {
+        i++;
+        setDisplayed(text.slice(0, i));
+        if (i >= text.length && intervalId) clearInterval(intervalId);
+      }, 62); // ~62ms per character
+    }, 520);
+
+    return () => {
+      clearTimeout(delayId);
+      if (intervalId) clearInterval(intervalId);
+    };
+  }, [text]);
+
+  return displayed;
 }
 
 // ── Diamond-shaped sparkle ────────────────────────────────────────────────────
@@ -85,8 +111,8 @@ function CarouselSkeleton() {
         <div className="absolute inset-0 flex items-center" style={{ paddingLeft: "clamp(24px,7vw,140px)" }}>
           <div className="flex flex-col gap-3">
             <div className="h-3 w-24 rounded bg-white/10" />
-            <div className="h-12 w-56 rounded bg-white/10" />
-            <div className="h-12 w-48 rounded bg-white/10" />
+            <div className="h-10 w-56 rounded bg-white/10" />
+            <div className="h-10 w-48 rounded bg-white/10" />
             <div className="h-1 w-14 rounded bg-white/10" />
             <div className="h-8 w-32 rounded bg-white/10" />
           </div>
@@ -126,9 +152,57 @@ const stagger = (i: number) => ({
   },
 });
 
+// ── Typewriter title component ────────────────────────────────────────────────
+function TypewriterTitle({
+  text,
+  accentGlow,
+  slideKey,
+}: {
+  text: string;
+  accentGlow: string;
+  slideKey: number;
+}) {
+  // Re-mount on slide change so animation restarts
+  const displayed = useTypewriter(text);
+
+  return (
+    <motion.h2
+      key={`${slideKey}-title`}
+      variants={stagger(1)}
+      initial="hidden"
+      animate="visible"
+      className="hero-display text-white"
+      style={{
+        // ← Smaller than before: was clamp(28px, 5.8vw, 92px)
+        fontSize: "clamp(22px, 4.2vw, 68px)",
+        fontWeight: 300,
+        lineHeight: 0.95,
+        letterSpacing: "-0.01em",
+        textShadow: `0 0 80px ${accentGlow}40, 0 4px 40px rgba(0,0,0,0.6)`,
+        margin: 0,
+      }}
+    >
+      {displayed}
+      {/* Blinking cursor while typing */}
+      {displayed.length < text.length && (
+        <span
+          style={{
+            display: "inline-block",
+            width: "2px",
+            height: "0.85em",
+            background: "rgba(255,255,255,0.6)",
+            marginLeft: "2px",
+            verticalAlign: "middle",
+            animation: "tw-blink 0.6s step-end infinite",
+          }}
+        />
+      )}
+    </motion.h2>
+  );
+}
+
 // ── Main carousel ─────────────────────────────────────────────────────────────
 export default function HeroCarousel({ initialSlides }: HeroCarouselProps) {
-  // Seed state directly from server-fetched props — no loading flash.
   const [slides, setSlides] = useState<HeroSlide[]>(initialSlides ?? []);
   const [loading, setLoading] = useState(!initialSlides);
   const [error, setError] = useState(false);
@@ -138,7 +212,6 @@ export default function HeroCarousel({ initialSlides }: HeroCarouselProps) {
   const touchStartX = useRef(0);
   const touchStartY = useRef(0);
 
-  // Detect mobile
   useEffect(() => {
     const mql = window.matchMedia("(max-width: 639px)");
     setIsMobile(mql.matches);
@@ -147,11 +220,8 @@ export default function HeroCarousel({ initialSlides }: HeroCarouselProps) {
     return () => mql.removeEventListener("change", handler);
   }, []);
 
-  // Only fetch from the API if we did NOT receive server-side data (e.g. when
-  // rendered outside the homepage, or during client-side navigation).
   useEffect(() => {
-    if (initialSlides) return; // already have data — skip the network call
-
+    if (initialSlides) return;
     let cancelled = false;
     setLoading(true);
     setError(false);
@@ -176,12 +246,9 @@ export default function HeroCarousel({ initialSlides }: HeroCarouselProps) {
   }, [initialSlides]);
 
   const go = useCallback(
-    (index: number) => {
-      setCurrent((index + slides.length) % slides.length);
-    },
+    (index: number) => setCurrent((index + slides.length) % slides.length),
     [slides.length]
   );
-
   const next = useCallback(
     () => setCurrent((c) => (c + 1) % slides.length),
     [slides.length]
@@ -191,14 +258,12 @@ export default function HeroCarousel({ initialSlides }: HeroCarouselProps) {
     [slides.length]
   );
 
-  // Auto-rotate
   useEffect(() => {
     if (isPaused || slides.length <= 1) return;
     const id = setInterval(next, AUTO_ROTATE_MS);
     return () => clearInterval(id);
   }, [isPaused, next, slides.length]);
 
-  // Keyboard navigation
   useEffect(() => {
     if (slides.length <= 1) return;
     const h = (e: KeyboardEvent) => {
@@ -209,13 +274,13 @@ export default function HeroCarousel({ initialSlides }: HeroCarouselProps) {
     return () => window.removeEventListener("keydown", h);
   }, [next, prev, slides.length]);
 
-  // Preload the next slide image so transitions stay smooth
+  // Preload next slide image
   useEffect(() => {
     if (slides.length <= 1) return;
     const nextIndex = (current + 1) % slides.length;
     const nextSlide = slides[nextIndex];
     if (!nextSlide) return;
-    const url = optimiseCloudinaryUrl(nextSlide.desktopImage, 1920);
+    const url = optimiseCloudinaryUrl(nextSlide.desktopImage);
     const img = new Image();
     img.src = url;
   }, [current, slides]);
@@ -237,11 +302,10 @@ export default function HeroCarousel({ initialSlides }: HeroCarouselProps) {
   const accent = b.accent || "#b8c9d4";
   const accentGlow = b.accentGlow || "#5a8fa8";
 
-  // Use mobile image on mobile if available, otherwise fall back to desktop.
-  // Apply Cloudinary optimisation: full width at the right breakpoint, high quality.
-  const desktopSrc = optimiseCloudinaryUrl(b.desktopImage, 1920);
+  // Full quality — no width downscaling, just format optimisation
+  const desktopSrc = optimiseCloudinaryUrl(b.desktopImage);
   const mobileSrc  = b.mobileImage
-    ? optimiseCloudinaryUrl(b.mobileImage, 768)
+    ? optimiseCloudinaryUrl(b.mobileImage)
     : desktopSrc;
   const bgImage = isMobile ? mobileSrc : desktopSrc;
 
@@ -253,6 +317,10 @@ export default function HeroCarousel({ initialSlides }: HeroCarouselProps) {
         .hero-label   { font-family: 'Barlow Condensed', sans-serif; font-weight: 300; }
         :root { --carousel-h: 42svh; }
         @media (min-width: 640px) { :root { --carousel-h: 70vh; } }
+        @keyframes tw-blink {
+          0%, 100% { opacity: 1; }
+          50%       { opacity: 0; }
+        }
       `}</style>
 
       <section
@@ -281,26 +349,22 @@ export default function HeroCarousel({ initialSlides }: HeroCarouselProps) {
               aria-roledescription="slide"
               aria-label={`Slide ${current + 1} of ${slides.length}`}
             >
-              {/* Background photo — full quality, responsive */}
+              {/* Background photo — original quality, no width downscale */}
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
                 src={bgImage}
-                // Hint the browser to load the desktop image eagerly at high res
-                // using a srcSet so the full resolution is fetched on wide screens.
                 srcSet={
                   b.mobileImage
-                    ? `${mobileSrc} 768w, ${desktopSrc} 1920w`
-                    : `${desktopSrc} 1920w`
+                    ? `${mobileSrc} 768w, ${desktopSrc} 3840w`
+                    : `${desktopSrc} 3840w`
                 }
                 sizes="100vw"
                 alt=""
                 aria-hidden="true"
-                // Eagerly decode & fetch the first slide; lazy-load the rest.
                 loading={current === 0 ? "eager" : "lazy"}
                 decoding="async"
                 fetchPriority={current === 0 ? "high" : "auto"}
                 onError={(e) => {
-                  // Fallback to desktop if mobile fails
                   if (isMobile && b.mobileImage && bgImage !== desktopSrc) {
                     (e.currentTarget as HTMLImageElement).src = desktopSrc;
                   }
@@ -319,7 +383,7 @@ export default function HeroCarousel({ initialSlides }: HeroCarouselProps) {
 
               <Scanlines />
 
-              {/* Dark gradient overlay for text readability */}
+              {/* Dark gradient overlay */}
               <div
                 className="absolute inset-0 z-10"
                 style={{
@@ -371,24 +435,12 @@ export default function HeroCarousel({ initialSlides }: HeroCarouselProps) {
                     </motion.div>
                   )}
 
-                  {/* Headline */}
-                  <motion.h2
-                    key={`${current}-title`}
-                    variants={stagger(1)}
-                    initial="hidden"
-                    animate="visible"
-                    className="hero-display text-white"
-                    style={{
-                      fontSize: "clamp(28px, 5.8vw, 92px)",
-                      fontWeight: 300,
-                      lineHeight: 0.9,
-                      letterSpacing: "-0.01em",
-                      textShadow: `0 0 80px ${accentGlow}40, 0 4px 40px rgba(0,0,0,0.6)`,
-                      margin: 0,
-                    }}
-                  >
-                    {b.title}
-                  </motion.h2>
+                  {/* ── Typewriter headline ── */}
+                  <TypewriterTitle
+                    text={b.title}
+                    accentGlow={accentGlow}
+                    slideKey={current}
+                  />
 
                   {/* Description */}
                   {b.description && (
@@ -444,8 +496,8 @@ export default function HeroCarousel({ initialSlides }: HeroCarouselProps) {
                         className="hero-label group inline-flex items-center gap-2"
                         style={{
                           fontSize: "clamp(8px, 0.95vw, 10px)",
-                          letterSpacing: "0.32em",
-                          textTransform: "uppercase",
+                          letterSpacing: "0.1em",
+                          
                           color: "rgba(255,255,255,0.7)",
                           textDecoration: "none",
                           border: `1px solid ${accent}66`,
@@ -547,8 +599,7 @@ export default function HeroCarousel({ initialSlides }: HeroCarouselProps) {
                   style={{
                     width: 1,
                     height: i === current ? 32 : 10,
-                    background:
-                      i === current ? accent : "rgba(255,255,255,0.2)",
+                    background: i === current ? accent : "rgba(255,255,255,0.2)",
                     border: "none",
                     padding: 0,
                     cursor: "pointer",
@@ -598,8 +649,7 @@ export default function HeroCarousel({ initialSlides }: HeroCarouselProps) {
                 style={{
                   height: 1,
                   width: i === current ? 28 : 8,
-                  background:
-                    i === current ? accent : "rgba(255,255,255,0.15)",
+                  background: i === current ? accent : "rgba(255,255,255,0.15)",
                   border: "none",
                   padding: 0,
                   cursor: "pointer",
